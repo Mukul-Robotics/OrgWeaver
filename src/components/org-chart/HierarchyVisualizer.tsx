@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils';
 import React from 'react';
 
 interface HierarchyVisualizerProps {
-  nodes: EmployeeNode[]; // These are the "root" nodes for the current view
+  nodes: EmployeeNode[];
   selectedAttributes: DisplayAttributeKey[];
   onSelectNode?: (nodeId: string) => void;
+  onEditClick?: (nodeId: string) => void; // New prop
   selectedNodeId?: string | null;
   pageSize: PageSize;
 }
@@ -19,10 +20,62 @@ const PAGE_DIMENSIONS: Record<Exclude<PageSize, 'fitToScreen'>, { width: string;
   letterLandscape: { width: '1056px', height: '816px' },
 };
 
+// Renders a single node and its direct children's cards in a grid
+const renderEmployeeSegment = (
+  node: EmployeeNode,
+  selectedAttributes: DisplayAttributeKey[],
+  onSelectNode?: (nodeId: string) => void,
+  onEditClick?: (nodeId: string) => void,
+  selectedNodeId?: string | null,
+  isRootNodeInView: boolean = false // True if this node is one of the initial 'nodes' passed to HierarchyVisualizer
+): JSX.Element => {
+  return (
+    <div key={node.id} className={cn("w-full", isRootNodeInView ? "mb-6" : "p-1")}>
+      <OrgChartNodeCard
+        node={node}
+        selectedAttributes={selectedAttributes}
+        onSelectNode={onSelectNode}
+        onEditClick={onEditClick}
+        isSelected={selectedNodeId === node.id}
+        hasChildren={node.children && node.children.length > 0}
+        className={cn(isRootNodeInView ? "" : "w-full")} // Ensure cards in grid take full cell width
+      />
+      {node.children && node.children.length > 0 && (
+        <div className={cn(
+          "mt-2 grid gap-3 pl-4 border-l-2 border-muted", // Indent children slightly & add connecting line
+          "grid-cols-2", 
+          "sm:grid-cols-3",
+          "md:grid-cols-4",
+          "lg:grid-cols-5",
+          "xl:grid-cols-6"
+        )}>
+          {node.children.map(childNode => (
+            // Render ONLY the card for each direct child.
+            // Do not recursively call renderEmployeeSegment here for deep nesting in this component.
+            // The drill-down is handled by changing the 'nodes' prop in the parent (OrgWeaverPage).
+            <OrgChartNodeCard
+              key={childNode.id}
+              node={childNode}
+              selectedAttributes={selectedAttributes}
+              onSelectNode={onSelectNode}
+              onEditClick={onEditClick}
+              isSelected={selectedNodeId === childNode.id}
+              hasChildren={childNode.children && childNode.children.length > 0}
+              className="w-full"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export function HierarchyVisualizer({
-  nodes,
+  nodes, // These are the "root" nodes for the current view
   selectedAttributes,
   onSelectNode,
+  onEditClick,
   selectedNodeId,
   pageSize,
 }: HierarchyVisualizerProps) {
@@ -34,46 +87,6 @@ export function HierarchyVisualizer({
     return PAGE_DIMENSIONS[pageSize] || { width: '100%', height: '100%' };
   }, [pageSize]);
 
-  // This function renders a node and a grid of its direct children's cards
-  const renderNodeAndItsDirectChildren = (node: EmployeeNode): JSX.Element => {
-    return (
-      <div key={node.id} className="mb-6 w-full"> {/* Container for the node and its direct children grid */}
-        <OrgChartNodeCard
-          node={node}
-          selectedAttributes={selectedAttributes}
-          onSelectNode={onSelectNode}
-          isSelected={selectedNodeId === node.id}
-          className="mb-2" // Space between this card and its children's grid
-          hasChildren={node.children && node.children.length > 0}
-        />
-        {node.children && node.children.length > 0 && (
-          // Grid container for THIS node's direct children's CARDS
-          <div className={cn(
-            "mt-2 grid gap-3 pl-4 border-l-2 border-muted", // Indent children slightly & add connecting line
-            // Responsive columns for the cards of direct children
-            "grid-cols-2",    // Default: 2 columns for smallest screens
-            "sm:grid-cols-3",  // 3 columns on sm screens
-            "md:grid-cols-4",  // 4 columns on md screens
-            "lg:grid-cols-5",  // 5 columns on lg screens
-            "xl:grid-cols-6"   // 6 columns on xl screens
-          )}>
-            {node.children.map(childNode => (
-              // Render ONLY the card for each direct child.
-              <OrgChartNodeCard
-                key={childNode.id}
-                node={childNode}
-                selectedAttributes={selectedAttributes}
-                onSelectNode={onSelectNode}
-                isSelected={selectedNodeId === childNode.id}
-                hasChildren={childNode.children && childNode.children.length > 0}
-                // className="w-full" // Card is already w-full by default within its grid cell
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   if (!nodes || nodes.length === 0) {
     return (
@@ -95,7 +108,7 @@ export function HierarchyVisualizer({
       id="hierarchy-visualizer-container"
     >
       {/* 'nodes' here are the current roots of the view (e.g., top-level employees, or a single employee if drilled down) */}
-      {nodes.map(node => renderNodeAndItsDirectChildren(node))}
+      {nodes.map(node => renderEmployeeSegment(node, selectedAttributes, onSelectNode, onEditClick, selectedNodeId, true))}
     </div>
   );
 }

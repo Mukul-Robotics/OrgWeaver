@@ -30,7 +30,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } 
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, LayoutPanelLeft, ArrowUpFromLine } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -82,23 +82,18 @@ export default function OrgWeaverPage() {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
-  const [viewStack, setViewStack] = useState<string[]>([]); // For drill-down
+  const [viewStack, setViewStack] = useState<string[]>([]);
 
   const { toast } = useToast();
 
   const currentViewNodes = useMemo(() => {
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
-
     if (!currentRootId) {
-      // Show all top-level employees
       return buildHierarchyTree(employees, null, 0);
     } else {
-      // Find the selected employee and make them the root of the view
       const rootEmployee = employees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
-        // This might happen if the employee was deleted while being viewed.
-        // Fallback to top level. A more robust solution would validate viewStack.
-        setViewStack([]); // Reset stack
+        setViewStack([]); // Reset stack if root employee not found
         return buildHierarchyTree(employees, null, 0);
       }
       // Create a single node representing the current root, and populate its children.
@@ -109,7 +104,11 @@ export default function OrgWeaverPage() {
         ...rootEmployee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
         children: children,
-        level: 0, // This is the root for the current view, so its level is 0 in this context
+        // The level for a drilled-down root is effectively 0 for its own rendering context,
+        // but its children's levels should be relative to its actual depth in the full tree.
+        // buildHierarchyTree's `currentLevel` param handles this correctly for children.
+        // We can use the original level for display if needed, or just pass 0.
+        level: employees.find(e => e.id === currentRootId)?.level || 0, 
       };
       return [rootNode];
     }
@@ -117,17 +116,14 @@ export default function OrgWeaverPage() {
 
 
   const currentEditingEmployee = useMemo(() => {
-    if (selectedNodeId) { // Edit modal can be opened independently of sidebarView
-      return employees.find(e => e.id === selectedNodeId) || null;
-    }
-    return null;
+    return selectedNodeId ? employees.find(e => e.id === selectedNodeId) || null : null;
   }, [employees, selectedNodeId]);
 
 
   const handleImportData = (data: Employee[], fileName: string) => {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(data);
-    setViewStack([]); // Reset drill-down on new data import
+    setViewStack([]); 
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
     if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
        triggerReorganizationSummary(originalEmployeesForSummary, data);
@@ -171,32 +167,40 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prev => prev.filter(id => id !== employeeId)); // Remove from view stack if present
+    setViewStack(prev => prev.filter(id => id !== employeeId)); 
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
     setSelectedNodeId(null);
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
+  // Handles card click for selection and drill-down
   const handleNodeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId); // For edit modal
-    setEditModalOpen(true);     // Open edit modal
+    setSelectedNodeId(nodeId); // Set for context (highlighting, delete button)
 
-    // For Drill Down: if node has children and isn't already the current root
-    const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
-    if (!isCurrentRoot) {
-        const nodeToDrill = employees.find(e => e.id === nodeId);
-        if (nodeToDrill) {
-            const hasChildren = employees.some(e => e.supervisorId === nodeId);
-            if (hasChildren) {
-                setViewStack(prevStack => [...prevStack, nodeId]);
-            }
+    const nodeToDrill = employees.find(e => e.id === nodeId);
+    if (nodeToDrill) {
+        const hasChildren = employees.some(e => e.supervisorId === nodeId);
+        // If the node has children and isn't already the current root, drill down.
+        const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
+        if (hasChildren && !isCurrentRoot) {
+            setViewStack(prevStack => [...prevStack, nodeId]);
         }
     }
   };
 
+  // Handles click on the edit icon on a card
+  const handleEditEmployeeClick = (nodeId: string) => {
+    setSelectedNodeId(nodeId); // Ensure this node is selected
+    setEditModalOpen(true);     // Open edit modal
+  };
+
+
   const handleGoUp = () => {
-    setViewStack(prevStack => prevStack.slice(0, -1));
-    setSelectedNodeId(null); // Deselect node when going up
+    const newStack = viewStack.slice(0, -1);
+    setViewStack(newStack);
+    // If going up results in an empty stack (back to top level), deselect node.
+    // Otherwise, select the new root of the view (the parent we just navigated to).
+    setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
   };
 
 
@@ -218,7 +222,7 @@ export default function OrgWeaverPage() {
     setIsLoadingAi(true);
     setSummaryModalOpen(true);
     try {
-      const originalHierarchyJson = JSON.stringify(original.map(({children, level, supervisorName, ...emp}) => emp)); // Strip transient props
+      const originalHierarchyJson = JSON.stringify(original.map(({children, level, supervisorName, ...emp}) => emp));
       const revisedHierarchyJson = JSON.stringify(revised.map(({children, level, supervisorName, ...emp}) => emp));
       const summary = await summarizeReorganizationImpact({
         originalHierarchy: originalHierarchyJson,
@@ -286,7 +290,8 @@ export default function OrgWeaverPage() {
       window.print();
     } catch (error) {
       console.error("Print error:", error);
-      toast({ title: 'Print Error', description: `Could not open print dialog: ${(error as Error).message}. Check browser console.`, variant: 'destructive'});
+      const errorMessage = (error instanceof Error) ? error.message : String(error);
+      toast({ title: 'Print Error', description: `Could not open print dialog: ${errorMessage}. Check browser console or sandbox settings.`, variant: 'destructive'});
     }
   };
 
@@ -385,6 +390,7 @@ export default function OrgWeaverPage() {
                 nodes={currentViewNodes}
                 selectedAttributes={selectedAttributes}
                 onSelectNode={handleNodeClick}
+                onEditClick={handleEditEmployeeClick}
                 selectedNodeId={selectedNodeId}
                 pageSize={pageSize}
               />
@@ -401,7 +407,7 @@ export default function OrgWeaverPage() {
       {currentEditingEmployee && (
         <EditEmployeeModal
             isOpen={isEditModalOpen}
-            onClose={() => { setEditModalOpen(false); setSelectedNodeId(null); }}
+            onClose={() => { setEditModalOpen(false); /* setSelectedNodeId(null); Don't nullify here, might be needed for delete context */ }}
             employee={currentEditingEmployee}
             allEmployees={employees}
             onUpdateEmployee={handleUpdateEmployee}
