@@ -2,7 +2,7 @@
 import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Briefcase, MapPin, DollarSign, Hash, UserCheck, ShieldAlert, Building, Edit3, Users2 } from 'lucide-react'; // Added Users2 for report counts
+import { Users, Briefcase, MapPin, DollarSign, Hash, UserCheck, ShieldAlert, Building, Edit3, Users2, Tag } from 'lucide-react';
 import { ALL_DISPLAY_ATTRIBUTES } from '@/types/org-chart';
 import { cn } from '@/lib/utils';
 
@@ -13,12 +13,13 @@ interface OrgChartNodeCardProps {
   onEditClick?: (nodeId: string) => void;
   isSelected?: boolean;
   className?: string;
+  hasChildren?: boolean; // This prop was part of a previous iteration, ensure it's used or removed if no longer needed by current drill-down logic
 }
 
 const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = {
   employeeNumber: Hash,
   employeeName: UserCheck,
-  supervisorId: ShieldAlert, 
+  supervisorId: ShieldAlert,
   supervisorName: ShieldAlert,
   positionTitle: Briefcase,
   jobName: Briefcase,
@@ -26,32 +27,44 @@ const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = 
   location: MapPin,
   proformaCost: DollarSign,
   grade: Users,
+  employeeCategory: Tag, // Added icon for Employee Category
 };
 
+const categoryBorderColors: Record<string, string> = {
+  'Executive': 'border-purple-500',
+  'Manager': 'border-blue-500',
+  'Individual Contributor': 'border-green-500',
+  'Support Staff': 'border-yellow-500',
+  // Add more categories and colors as needed
+};
 
 export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className }: OrgChartNodeCardProps) {
-  const cardStyle = isSelected ? { borderColor: 'hsl(var(--primary))', borderWidth: '2px' } : {};
+  const categoryBorderClass = node.employeeCategory ? categoryBorderColors[node.employeeCategory] : '';
 
   const getDisplayValue = (attrKey: DisplayAttributeKey): string | number | undefined => {
     if (attrKey === 'employeeNumber') return node.id;
-    if (attrKey === 'supervisorId' && (selectedAttributes.includes('supervisorName') || !node.supervisorId)) return undefined;
+    // Do not display supervisorId if supervisorName is selected and available, or if supervisorId is null (handled by check below)
+    if (attrKey === 'supervisorId' && (selectedAttributes.includes('supervisorName') && node.supervisorName)) return undefined;
+    if (attrKey === 'supervisorId' && !node.supervisorId) return undefined; // Don't show if null
     return node[attrKey as keyof EmployeeNode];
   }
 
   const hasReports = (node.totalReportCount ?? 0) > 0;
+  const displayHasChildrenIndicator = (node.children && node.children.length > 0);
+
 
   return (
     <Card
       className={cn(
         `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full flex flex-col h-[160px]`,
         onSelectNode ? 'cursor-pointer' : '',
-        isSelected ? 'ring-2 ring-primary' : '',
+        isSelected ? 'ring-2 ring-primary' : 'border-border', // Default border, can be overridden by categoryBorderClass
+        categoryBorderClass, // Apply category-specific border color
         className
       )}
-      style={cardStyle}
       onClick={onSelectNode ? () => onSelectNode(node.id) : undefined}
       aria-selected={isSelected}
-      aria-haspopup={hasReports ? "tree" : undefined} // Use hasReports for aria-haspopup
+      aria-haspopup={displayHasChildrenIndicator ? "tree" : undefined}
     >
       <CardHeader className="p-1.5 pb-0">
         <div className="flex items-center justify-between">
@@ -63,7 +76,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
             {onEditClick && (
               <button
                 onClick={(e) => {
-                  e.stopPropagation(); 
+                  e.stopPropagation();
                   onEditClick(node.id);
                 }}
                 className="p-0.5 rounded hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring"
@@ -73,18 +86,20 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
                 <Edit3 className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
               </button>
             )}
-            {/* Removed ChevronDownSquare icon */}
           </div>
         </div>
         <CardDescription className="text-xs truncate" title={node.positionTitle}>{node.positionTitle}</CardDescription>
       </CardHeader>
       <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5 flex-1 overflow-y-auto flex flex-col">
-        <div className="flex-grow"> {/* Wrapper for attributes to allow report counts to be at bottom */}
+        <div className="flex-grow">
           {selectedAttributes.map((attrKey) => {
             const value = getDisplayValue(attrKey);
             if (value === undefined || value === null || value === '') return null;
+            // These are already displayed in CardHeader or implicitly (like ID)
             if (attrKey === 'employeeName' || attrKey === 'positionTitle') return null;
-            if (attrKey === 'employeeNumber' && node.id === value && !selectedAttributes.includes('employeeNumber')) return null;
+            // Only show employeeNumber if explicitly selected AND it's not just repeating the ID (which is always available to the component)
+            if (attrKey === 'employeeNumber' && !ALL_DISPLAY_ATTRIBUTES[attrKey]) return null;
+
 
             const Icon = attributeIcons[attrKey];
             return (
@@ -103,7 +118,6 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
             <Badge variant="secondary" className="mt-0.5 text-xs py-0 px-1">{node.department}</Badge>
           )}
         </div>
-        {/* Display Report Counts */}
         {hasReports && (
           <div className="mt-auto pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1">
             <Users2 className="h-3 w-3" />

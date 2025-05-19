@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +28,7 @@ const employeeFormSchema = z.object({
   department: z.string().optional(),
   location: z.string().optional(),
   proformaCost: z.coerce.number().min(0, { message: "Proforma cost must be a positive number." }),
+  employeeCategory: z.string().optional(), // Added employee category
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -41,8 +43,8 @@ interface AddEmployeeFormProps {
 export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel }: AddEmployeeFormProps) {
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
-    defaultValues: existingEmployee 
-      ? { ...existingEmployee, supervisorId: existingEmployee.supervisorId || null } 
+    defaultValues: existingEmployee
+      ? { ...existingEmployee, supervisorId: existingEmployee.supervisorId || null }
       : {
         employeeName: '',
         supervisorId: null,
@@ -52,6 +54,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         department: '',
         location: '',
         proformaCost: 0,
+        employeeCategory: '', // Default for new employee
       },
   });
 
@@ -60,7 +63,8 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
       ...values,
       id: existingEmployee?.id || values.id || generateUniqueID(), // Use existing ID or generate new
       supervisorId: values.supervisorId || null, // Ensure supervisorId is null if empty string
-      proformaCost: Number(values.proformaCost)
+      proformaCost: Number(values.proformaCost),
+      employeeCategory: values.employeeCategory || undefined, // Store undefined if empty
     };
     onSubmit(employeeData);
     if (!existingEmployee) { // Reset form only if it's a new employee
@@ -117,7 +121,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               name="supervisorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supervisor (Employee No.)</FormLabel>
+                  <FormLabel>Supervisor</FormLabel>
                   <FormControl>
                      <select
                         {...field}
@@ -146,7 +150,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                 <FormItem>
                   <FormLabel>Department</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Engineering" {...field} />
+                    <Input placeholder="e.g. Engineering" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -172,7 +176,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                 <FormItem>
                   <FormLabel>Grade</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. L5" {...field} />
+                    <Input placeholder="e.g. L5" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -185,7 +189,20 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                 <FormItem>
                   <FormLabel>Location</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. New York" {...field} />
+                    <Input placeholder="e.g. New York" {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="employeeCategory"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employee Category</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Manager, Contributor" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -53,7 +53,7 @@ export function convertToCSV(employees: Employee[]): string {
   }
   const headers: (keyof Employee)[] = [
     'id', 'employeeName', 'supervisorId', 'positionTitle', 'jobName', 
-    'grade', 'department', 'location', 'proformaCost'
+    'grade', 'department', 'location', 'proformaCost', 'employeeCategory' // Added employeeCategory
   ];
   
   const csvRows = [
@@ -62,7 +62,7 @@ export function convertToCSV(employees: Employee[]): string {
       headers.map(fieldName => {
         const value = row[fieldName];
         if (value === null || value === undefined) return ''; 
-        return JSON.stringify(value);
+        return JSON.stringify(value); // Handles commas and quotes within values
       }).join(',')
     ),
   ];
@@ -78,9 +78,8 @@ export function parseCSV(csvString: string): Employee[] {
   const rows = csvString.trim().split(/\r\n|\n/); 
   if (rows.length < 2) return [];
 
-  // Strip potential UTF-8 BOM from headers
   const headerString = rows[0].charCodeAt(0) === 0xFEFF ? rows[0].substring(1) : rows[0];
-  const headers = headerString.split(',') as (keyof Employee)[];
+  const headers = headerString.split(',').map(h => h.trim()) as (keyof Employee)[];
   const dataRows = rows.slice(1);
 
   return dataRows.map(rowString => {
@@ -105,42 +104,44 @@ export function parseCSV(csvString: string): Employee[] {
     }
     values.push(currentVal); 
 
-    const employee = {} as Employee;
+    const employee = {} as Partial<Employee>; // Use Partial for progressive assignment
     headers.forEach((header, index) => {
-      let value: string | number | null = values[index] ? values[index].trim() : '';
+      let value: string | number | null | undefined = values[index] ? values[index].trim() : '';
       
+      // Attempt to parse if it looks like a JSON stringified value (e.g., "some value", "null")
       if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
         try {
-         value = JSON.parse(value); // For values explicitly quoted like "string" or "null"
+         value = JSON.parse(value); 
         } catch {
-            // If JSON.parse fails, it's likely a string that happens to start/end with quotes,
-            // but isn't a valid JSON string literal (e.g. ""some text"").
-            // In this case, we might want to keep it as is, or remove the outer quotes.
-            // For simplicity here, we'll try to unquote if it looks like simple quotes.
-            if (value.length >=2) value = value.substring(1, value.length -1);
+          // If JSON.parse fails, it's likely a string that happens to start/end with quotes.
+          // Remove the outer quotes.
+          if (value.length >=2) value = value.substring(1, value.length -1);
         }
       }
-
-
+      
       const cleanHeader = header.trim() as keyof Employee;
 
       if (cleanHeader === 'proformaCost') {
-        (employee[cleanHeader] as any) = parseFloat(value as string) || 0;
+        employee[cleanHeader] = parseFloat(value as string) || 0;
       } else if (cleanHeader === 'supervisorId') {
-        (employee[cleanHeader] as any) = value === 'null' || value === '' || value === null ? null : String(value);
+        employee[cleanHeader] = (value === 'null' || value === '' || value === null || value === undefined) ? null : String(value);
       } else if (cleanHeader === 'id') {
-        (employee[cleanHeader] as any) = String(value);
-      } else if (value === 'null' || value === undefined) {
-        (employee[cleanHeader] as any) = undefined; // Store actual undefined for optional fields
+         employee[cleanHeader] = String(value);
+      } else if (value === 'null' || value === undefined || value === '') {
+        employee[cleanHeader] = undefined; // Store actual undefined for optional fields
       }
       else {
-        (employee[cleanHeader] as any) = value;
+        employee[cleanHeader] = value as any;
       }
     });
-    employee.id = String(employee.id);
-    employee.proformaCost = Number(employee.proformaCost);
-    if (employee.supervisorId === "null") employee.supervisorId = null; // Ensure "null" string becomes actual null
-    return employee;
+    // Ensure required fields have default values if not present or parsed incorrectly
+    employee.id = String(employee.id || generateUniqueID());
+    employee.employeeName = String(employee.employeeName || 'Unknown Employee');
+    employee.positionTitle = String(employee.positionTitle || 'Unknown Position');
+    employee.jobName = String(employee.jobName || 'Unknown Job');
+    employee.proformaCost = Number(employee.proformaCost || 0);
+    
+    return employee as Employee;
   });
 }
 

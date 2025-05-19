@@ -9,6 +9,7 @@ export interface Employee {
   department?: string;
   location?: string;
   proformaCost: number;
+  employeeCategory?: string; // Added employee category
 }
 
 export interface EmployeeNode extends Employee {
@@ -30,7 +31,8 @@ export type DisplayAttributeKey =
   | 'grade'
   | 'department'
   | 'location'
-  | 'proformaCost';
+  | 'proformaCost'
+  | 'employeeCategory'; // Added employee category
 
 export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
   employeeNumber: "Employee No.",
@@ -43,6 +45,7 @@ export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
   department: "Department",
   location: "Location",
   proformaCost: "Proforma Cost",
+  employeeCategory: "Category", // Added employee category display name
 };
 
 // Default attributes to display
@@ -51,6 +54,7 @@ export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'positionTitle',
   'department',
   'proformaCost',
+  'employeeCategory', // Added employeeCategory to default display
 ];
 
 export interface ReorganizationSummaryData {

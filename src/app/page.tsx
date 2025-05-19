@@ -30,7 +30,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } 
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -56,12 +56,14 @@ import {
 
 // Sample Data (can be replaced by actual import)
 const initialSampleEmployees: Employee[] = [
-  { id: '1', employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000 },
-  { id: '2', employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000 },
-  { id: '3', employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000 },
-  { id: '4', employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000 },
-  { id: '5', employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', location: 'Remote', proformaCost: 150000 },
-  { id: '6', employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', grade: 'L6', proformaCost: 140000 },
+  { id: '1', employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Executive' },
+  { id: '2', employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Manager' },
+  { id: '3', employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000, employeeCategory: 'Manager' },
+  { id: '4', employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000, employeeCategory: 'Manager' },
+  { id: '5', employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', location: 'Remote', proformaCost: 150000, employeeCategory: 'Individual Contributor' },
+  { id: '6', employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', grade: 'L6', proformaCost: 140000, employeeCategory: 'Individual Contributor' },
+  { id: '7', employeeName: 'Gary Goodsupport', supervisorId: '3', positionTitle: 'Support Manager', jobName: 'Support Manager', department: 'Operations', proformaCost: 90000, employeeCategory: 'Manager' },
+  { id: '8', employeeName: 'Helen Helpful', supervisorId: '7', positionTitle: 'Support Specialist', jobName: 'Support Spec.', department: 'Operations', proformaCost: 60000, employeeCategory: 'Support Staff' },
 ];
 
 
@@ -96,7 +98,6 @@ export default function OrgWeaverPage() {
         setViewStack([]); // Reset stack if root employee not found
         return buildHierarchyTree(employees, null, 0);
       }
-      // Create a single node representing the current root, and populate its children.
       const children = buildHierarchyTree(employees, rootEmployee.id, (employees.find(e => e.id === currentRootId)?.level || 0) + 1);
       const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
 
@@ -104,11 +105,9 @@ export default function OrgWeaverPage() {
         ...rootEmployee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
         children: children,
-        // The level for a drilled-down root is effectively 0 for its own rendering context,
-        // but its children's levels should be relative to its actual depth in the full tree.
-        // buildHierarchyTree's `currentLevel` param handles this correctly for children.
-        // We can use the original level for display if needed, or just pass 0.
-        level: employees.find(e => e.id === currentRootId)?.level || 0, 
+        level: employees.find(e => e.id === currentRootId)?.level || 0,
+        directReportCount: children.length,
+        totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
       };
       return [rootNode];
     }
@@ -123,7 +122,7 @@ export default function OrgWeaverPage() {
   const handleImportData = (data: Employee[], fileName: string) => {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(data);
-    setViewStack([]); 
+    setViewStack([]);
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
     if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
        triggerReorganizationSummary(originalEmployeesForSummary, data);
@@ -167,20 +166,18 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prev => prev.filter(id => id !== employeeId)); 
+    setViewStack(prev => prev.filter(id => id !== employeeId));
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
     setSelectedNodeId(null);
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
-  // Handles card click for selection and drill-down
   const handleNodeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId); // Set for context (highlighting, delete button)
+    setSelectedNodeId(nodeId);
 
     const nodeToDrill = employees.find(e => e.id === nodeId);
     if (nodeToDrill) {
         const hasChildren = employees.some(e => e.supervisorId === nodeId);
-        // If the node has children and isn't already the current root, drill down.
         const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
         if (hasChildren && !isCurrentRoot) {
             setViewStack(prevStack => [...prevStack, nodeId]);
@@ -188,18 +185,15 @@ export default function OrgWeaverPage() {
     }
   };
 
-  // Handles click on the edit icon on a card
   const handleEditEmployeeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId); // Ensure this node is selected
-    setEditModalOpen(true);     // Open edit modal
+    setSelectedNodeId(nodeId);
+    setEditModalOpen(true);
   };
 
 
   const handleGoUp = () => {
     const newStack = viewStack.slice(0, -1);
     setViewStack(newStack);
-    // If going up results in an empty stack (back to top level), deselect node.
-    // Otherwise, select the new root of the view (the parent we just navigated to).
     setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
   };
 
@@ -210,7 +204,7 @@ export default function OrgWeaverPage() {
       const jobsCovered = Array.from(new Set(revised.map(e => e.jobName || 'N/A')));
       setReorgSummary({
         summary: "Initial organization structure loaded.",
-        costChange: currentCost, 
+        costChange: currentCost,
         jobsAdded: jobsCovered,
         jobsRemoved: [],
         jobsCovered: jobsCovered,
@@ -222,8 +216,8 @@ export default function OrgWeaverPage() {
     setIsLoadingAi(true);
     setSummaryModalOpen(true);
     try {
-      const originalHierarchyJson = JSON.stringify(original.map(({children, level, supervisorName, ...emp}) => emp));
-      const revisedHierarchyJson = JSON.stringify(revised.map(({children, level, supervisorName, ...emp}) => emp));
+      const originalHierarchyJson = JSON.stringify(original.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp));
+      const revisedHierarchyJson = JSON.stringify(revised.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp));
       const summary = await summarizeReorganizationImpact({
         originalHierarchy: originalHierarchyJson,
         revisedHierarchy: revisedHierarchyJson,
@@ -246,7 +240,7 @@ export default function OrgWeaverPage() {
     setIsLoadingAi(true);
     setAiModalOpen(true);
     try {
-      const currentHierarchyJson = JSON.stringify(employees.map(({children, level, supervisorName, ...emp}) => emp));
+      const currentHierarchyJson = JSON.stringify(employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp));
       const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs.";
       const recommendations = await recommendHierarchyOptimizations({
         organizationHierarchy: currentHierarchyJson,
@@ -267,7 +261,7 @@ export default function OrgWeaverPage() {
       toast({ title: 'No Data', description: 'Nothing to save.', variant: 'destructive'});
       return;
     }
-    const dataStr = JSON.stringify(employees.map(({children, level, supervisorName, ...emp}) => emp), null, 2);
+    const dataStr = JSON.stringify(employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp), null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -385,7 +379,7 @@ export default function OrgWeaverPage() {
           </Sidebar>
 
           <SidebarInset className="flex-1 flex flex-col">
-            <main className="flex-1 p-0 overflow-hidden">
+            <main className="flex-1 p-0 overflow-hidden"> {/* Changed p-4 to p-0 and added overflow-hidden */}
               <HierarchyVisualizer
                 nodes={currentViewNodes}
                 selectedAttributes={selectedAttributes}
@@ -400,7 +394,7 @@ export default function OrgWeaverPage() {
       </div>
 
       <ImportDataModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImport={handleImportData} />
-      <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees.map(({children, level, supervisorName, ...emp}) => emp)} fileNamePrefix="orgweaver_export"/>
+      <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp)} fileNamePrefix="orgweaver_export"/>
       <AiRecommendationsModal isOpen={isAiModalOpen} onClose={() => setAiModalOpen(false)} recommendationsData={aiRecommendations} isLoading={isLoadingAi} />
       <ReorganizationSummaryModal isOpen={isSummaryModalOpen} onClose={() => setSummaryModalOpen(false)} summaryData={reorgSummary} isLoading={isLoadingAi} />
 
