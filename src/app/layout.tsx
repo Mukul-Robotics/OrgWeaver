@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import { Geist, Geist_Mono } from 'next/font/google'; // Assuming Geist is correctly configured
 import './globals.css';
@@ -30,6 +31,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="stylesheet" href="/print.css" media="print" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster />

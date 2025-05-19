@@ -1,0 +1,129 @@
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm; /* Standard A4 margin */
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: #fff !important;
+    color: #000 !important;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide non-essential elements */
+  header.sticky, /* AppHeader */
+  div[data-sidebar="sidebar"], /* Sidebar main div */
+  div[data-sidebar="sidebar"] ~ div, /* Sibling divs of the sidebar if any at root */
+  button[aria-label="Delete Selected Employee"], /* Specific delete button */
+  .ToastViewport, /* Toasts */
+  div[role="dialog"], /* All modals */
+  aside[data-radix-focus-guard], /* Focus guards from Radix */
+  .group\/sidebar-wrapper > div:not(.flex-1.flex.flex-col), /* Hide sidebar container but not main content wrapper */
+  .md\:hidden[data-sidebar="trigger"], /* Mobile sidebar trigger */
+  button:not([aria-label="Delete Selected Employee"]) /* Hide all buttons except explicitly kept ones, if any. The print button itself is good to hide. */
+   {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Ensure the main content area (SidebarInset) and chart visualizer expand */
+  .flex-1.flex.flex-col, /* Parent of <main> */
+  main.flex-1.p-0.overflow-hidden {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    flex: 1 1 auto !important; /* Allow shrinking if content is small, but grow */
+    display: block !important; /* Change from flex to block for simpler print layout */
+  }
+  
+  /* HierarchyVisualizer root and its direct children (ul) */
+  .p-1.md\:p-2.overflow-auto.h-full.bg-background,
+  .flex.flex-wrap.justify-center.gap-2 {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background-color: #fff !important; /* Ensure white background for print */
+    display: block; /* Simpler layout for printing */
+  }
+  
+  /* Styling for individual OrgChartNodeCards for print */
+  .shadow-sm,
+  .hover\:shadow-lg,
+  .transition-shadow,
+  .cursor-pointer,
+  .ring-2.ring-primary {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important; /* A clear border for each card */
+    page-break-inside: avoid !important; /* Attempt to keep cards on one page */
+    background-color: #fff !important;
+    margin-bottom: 8px; /* Add some space between cards if they stack due to page breaks */
+  }
+
+  /* Ensure card content text is legible */
+  .text-primary, 
+  .text-muted-foreground, 
+  .text-foreground, 
+  .text-foreground\/80,
+  .text-card-foreground,
+  .text-popover-foreground {
+    color: #000 !important;
+  }
+
+  .bg-primary, .bg-secondary, .bg-accent, .bg-card, .bg-popover {
+    background-color: transparent !important;
+    color: #000 !important;
+  }
+
+  .badge {
+    border: 1px solid #ddd !important;
+    color: #000 !important;
+    background-color: #fff !important;
+  }
+
+  /* Hierarchy lines */
+  .border-l-2 {
+    border-left-width: 1px !important;
+    /* Use a consistent color for all lines or remove if not desired for print */
+    border-color: #aaa !important; 
+    padding-left: 8px !important; /* Ensure padding is reasonable */
+  }
+  
+  /* Remove fixed positioning for delete button if it wasn't caught by general button hiding */
+  .fixed.bottom-4.right-4 {
+      display: none !important;
+  }
+
+  /* Ensure icons are visible if they use foreground color */
+  .lucide-react {
+    color: #000 !important;
+  }
+
+  /* Reset flex properties on node list items for simpler block layout in print */
+  ul > li[class*="basis-"] {
+    flex-basis: auto !important;
+    width: 100% !important; /* Each node takes full width, will stack vertically */
+    display: block !important; /* Ensure it's a block element */
+    margin-bottom: 10px; /* Space between stacked nodes */
+  }
+   /* Reset justify-center for the main list of nodes to allow block layout */
+  .flex.flex-wrap.justify-center.gap-2 {
+    justify-content: flex-start !important; /* Align to start for block layout */
+  }
+}
+
+/* Additional styles to ensure the page content itself can be targeted */
+#printable-area { /* You might need to wrap your chart in a div with this id */
+  width: 100%;
+}

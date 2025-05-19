@@ -30,7 +30,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } 
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -223,6 +223,14 @@ export default function OrgWeaverPage() {
     setSelectedNodeId(nodeId);
     setEditModalOpen(true);
   };
+  
+  const handlePrintChart = () => {
+    if (employees.length === 0) {
+      toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
+      return;
+    }
+    window.print();
+  };
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -242,8 +250,11 @@ export default function OrgWeaverPage() {
                       <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setImportModalOpen(true)}>
                         <Import className="mr-2 h-4 w-4" /> Import Data
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setExportModalOpen(true)}>
+                      <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setExportModalOpen(true)}>
                         <FileOutput className="mr-2 h-4 w-4" /> Export Chart
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start" onClick={handlePrintChart}>
+                        <Printer className="mr-2 h-4 w-4" /> Print Chart
                       </Button>
                     </SidebarGroup>
                     <Separator className="my-4" />
