@@ -13,10 +13,10 @@ interface HierarchyVisualizerProps {
 }
 
 const PAGE_DIMENSIONS: Record<Exclude<PageSize, 'fitToScreen'>, { width: string; height: string }> = {
-  a4Portrait: { width: '794px', height: '1123px' },    // 210mm x 297mm @ ~96DPI
-  a4Landscape: { width: '1123px', height: '794px' },   // 297mm x 210mm @ ~96DPI
-  letterPortrait: { width: '816px', height: '1056px' }, // 8.5in x 11in @ ~96DPI
-  letterLandscape: { width: '1056px', height: '816px' },// 11in x 8.5in @ ~96DPI
+  a4Portrait: { width: '794px', height: '1123px' },
+  a4Landscape: { width: '1123px', height: '794px' },
+  letterPortrait: { width: '816px', height: '1056px' },
+  letterLandscape: { width: '1056px', height: '816px' },
 };
 
 export function HierarchyVisualizer({
@@ -36,28 +36,27 @@ export function HierarchyVisualizer({
 
   const renderEmployeeSegment = (node: EmployeeNode, level: number): JSX.Element => {
     return (
-      <div key={node.id} className="mb-4 w-full">
+      <div key={node.id} className="mb-4 w-full"> {/* Container for an employee's card and their direct reports */}
         <OrgChartNodeCard
           node={node}
           selectedAttributes={selectedAttributes}
           onSelectNode={onSelectNode}
           isSelected={selectedNodeId === node.id}
-          className="mb-2"
+          className="mb-2" // Space between this card and its children's grid
         />
         {node.children && node.children.length > 0 && (
+          // Grid container for direct reports (children)
           <div className={cn(
-            "mt-1 flex flex-wrap justify-center -mx-2",
-            "gap-y-2" 
+            "mt-1 grid gap-2", // Use grid layout with a gap
+            "grid-cols-2",    // Default to 2 columns for the smallest screens
+            "sm:grid-cols-3",  // 3 columns on sm screens
+            "md:grid-cols-4",  // 4 columns on md screens
+            "lg:grid-cols-5",  // 5 columns on lg screens
+            "xl:grid-cols-6"   // 6 columns on xl screens
           )}>
             {node.children.map(child => (
-              <div key={child.id} className={cn(
-                "flex-shrink-0 flex-grow-0 px-2",
-                "basis-1/2",
-                "sm:basis-1/3",
-                "md:basis-1/4",
-                "lg:basis-1/5",
-                "xl:basis-1/6"
-              )}>
+              // Each child's segment becomes a grid item
+              <div key={child.id}>
                 {renderEmployeeSegment(child, level + 1)}
               </div>
             ))}
@@ -81,11 +80,12 @@ export function HierarchyVisualizer({
     <div 
       style={visualizerStyle}
       className={cn(
-        "p-1 md:p-2 overflow-auto bg-background mx-auto", // Added mx-auto to center if smaller than container
-        pageSize === 'fitToScreen' ? 'h-full w-full' : 'shadow-lg border my-4' // ensure h-full for fitToScreen, add border/shadow for fixed
+        "p-1 md:p-2 overflow-auto bg-background mx-auto",
+        pageSize === 'fitToScreen' ? 'h-full w-full' : 'shadow-lg border my-4'
       )}
-      id="hierarchy-visualizer-container" // Added an ID for potential print CSS targeting
+      id="hierarchy-visualizer-container"
     >
+      {/* Top-level nodes will stack vertically by default due to the div in renderEmployeeSegment */}
       {nodes.map(node => renderEmployeeSegment(node, node.level ?? 0))}
     </div>
   );
