@@ -28,7 +28,7 @@ import { ExportDataModal } from '@/components/modals/ExportDataModal';
 import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsModal';
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
-import { LogoIcon } from '@/components/icons/LogoIcon'; // Added import
+import { LogoIcon } from '@/components/icons/LogoIcon';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
 import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
@@ -78,8 +78,9 @@ const initialSampleEmployees: Employee[] = [
   { id: '14', employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern' },
 ];
 
+
 // Helper function to recursively build a filtered tree for search results
-// It takes the full list of employees and the set of IDs that match the search
+// It includes nodes that directly match or are ancestors of matching nodes.
 const buildFilteredTreeForSearch = (
   allEmployees: Employee[],
   matchingEmployeeIds: Set<string>,
@@ -91,24 +92,20 @@ const buildFilteredTreeForSearch = (
   const childrenOfSupervisor = allEmployees.filter(e => e.supervisorId === currentSupervisorId);
 
   childrenOfSupervisor.forEach(employee => {
-    // Recursively find children who match or lead to a match
     const childrenNodes = buildFilteredTreeForSearch(
       allEmployees,
       matchingEmployeeIds,
-      employee.id, // Current employee's ID becomes supervisorId for next level
+      employee.id,
       currentLevel + 1,
       fullEmployeeMap
     );
 
-    // Include this employee in the results if:
-    // 1. They directly match the search criteria.
-    // 2. Or, they have children (recursively) who match the search criteria.
     if (matchingEmployeeIds.has(employee.id) || childrenNodes.length > 0) {
       const supervisor = employee.supervisorId ? fullEmployeeMap.get(employee.supervisorId) : null;
       
-      let totalReportCount = childrenNodes.length;
+      let totalReportCountInFilteredBranch = childrenNodes.length;
       childrenNodes.forEach(child => {
-        totalReportCount += child.totalReportCount || 0; // Summing up total reports from children
+        totalReportCountInFilteredBranch += child.totalReportCount || 0;
       });
 
       nodes.push({
@@ -116,13 +113,13 @@ const buildFilteredTreeForSearch = (
         supervisorName: supervisor?.employeeName,
         children: childrenNodes,
         level: currentLevel,
-        directReportCount: childrenNodes.length, // Direct reports *that are part of the filtered result tree*
-        totalReportCount: totalReportCount, // Total reports *within this filtered branch*
-        // isSearchResultDirectMatch: matchingEmployeeIds.has(employee.id) // Optional flag for styling matches
+        directReportCount: childrenNodes.length,
+        totalReportCount: totalReportCountInFilteredBranch,
+        // isSearchResultDirectMatch: matchingEmployeeIds.has(employee.id) // Optional: for styling direct matches
       });
     }
   });
-  nodes.sort((a, b) => a.employeeName.localeCompare(b.employeeName)); // Sort siblings
+  nodes.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
   return nodes;
 };
 
@@ -149,14 +146,9 @@ export default function OrgWeaverPage() {
 
   const { toast } = useToast();
 
-  // sourceEmployees will now be the full list, and filtering for display happens in currentViewNodes
-  const sourceEmployees = useMemo(() => {
-    return employees; 
-  }, [employees]);
-
   const filteredEmployeeIds = useMemo(() => {
     if (!searchTerm.trim()) {
-      return null; // No search term, so no filtering needed by ID
+      return null;
     }
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     return new Set(
@@ -175,57 +167,93 @@ export default function OrgWeaverPage() {
     );
   }, [employees, searchTerm]);
 
+  // Effect to reset view when search term becomes active or is cleared
   useEffect(() => {
-    if (searchTerm.trim()) {
-      setViewStack([]); // Reset drill-down when search is active
-      setSelectedNodeId(null);
+    // Only reset if search term existence changes (empty to non-empty, or non-empty to empty)
+    const isSearching = searchTerm.trim() !== '';
+    const wasSearching = viewStack.some(id => !employees.find(e => e.id === id)); // Heuristic: if viewStack has non-existent items, likely was search
+
+    if (isSearching || (wasSearching && !isSearching) ) {
+        setViewStack([]);
+        setSelectedNodeId(null);
     }
-  }, [searchTerm]);
+  }, [searchTerm, employees]);
 
 
   const currentViewNodes = useMemo(() => {
     const fullEmployeeMap = new Map(employees.map(e => [e.id, e]));
 
     if (searchTerm.trim()) {
+      // Active search
       if (!filteredEmployeeIds || filteredEmployeeIds.size === 0) return [];
-      return buildFilteredTreeForSearch(employees, filteredEmployeeIds, null, 0, fullEmployeeMap);
-    }
 
-    // Not searching, handle normal drill-down view
-    const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
-
-    if (!currentRootId) {
-      // Not drilled down, show top-level from all employees
-      return buildHierarchyTree(employees, null, 0);
-    } else {
-      // Drilled down view
-      const rootEmployee = employees.find(e => e.id === currentRootId);
-      if (!rootEmployee) {
-        // Invalid rootId in viewStack, reset to top-level from full list
-        return buildHierarchyTree(employees, null, 0);
-      }
+      // Build the full tree of search results (includes ancestors of matches)
+      const searchResultTree = buildFilteredTreeForSearch(employees, filteredEmployeeIds, null, 0, fullEmployeeMap);
       
-      let originalLevel = 0;
-      let tempSupervisorId = rootEmployee.supervisorId;
-      const allEmployeesMap = new Map(employees.map(e => [e.id, e])); 
-      while(tempSupervisorId) {
-        originalLevel++;
-        const supervisor = allEmployeesMap.get(tempSupervisorId);
-        tempSupervisorId = supervisor ? supervisor.supervisorId : null;
+      const currentSearchRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+
+      if (!currentSearchRootId) {
+        return searchResultTree; // Show top-level of search results
+      } else {
+        // Attempt to find the drilled-down node within the searchResultTree
+        let rootNodeFromSearch: EmployeeNode | null = null;
+        const findNodeInTreeRecursive = (nodes: EmployeeNode[], id: string): EmployeeNode | null => {
+          for (const node of nodes) {
+            if (node.id === id) return node;
+            if (node.children) {
+              const found = findNodeInTreeRecursive(node.children, id);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
+        
+        if (rootNodeFromSearch) {
+          return [rootNodeFromSearch]; // Show the drilled-down node from search results
+        }
+        // If currentSearchRootId (from old viewStack) isn't in the new searchResultTree,
+        // useEffect should have cleared viewStack, so we show searchResultTree roots.
+        return searchResultTree; 
       }
+    } else {
+      // Not searching, handle normal drill-down view
+      const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
-      const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1);
-      const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
+      if (!currentRootId) {
+        // Top-level view
+        return buildHierarchyTree(employees, null, 0);
+      } else {
+        // Drilled-down view
+        const rootEmployee = employees.find(e => e.id === currentRootId);
+        if (!rootEmployee) {
+          // Invalid rootId in viewStack (e.g., employee deleted), reset to top-level
+          setViewStack([]); // Clear stack to prevent invalid state
+          return buildHierarchyTree(employees, null, 0);
+        }
+        
+        // Calculate original level of the rootEmployee
+        let originalLevel = 0;
+        let tempSupervisorId = rootEmployee.supervisorId;
+        while(tempSupervisorId) {
+          originalLevel++;
+          const supervisor = fullEmployeeMap.get(tempSupervisorId);
+          tempSupervisorId = supervisor ? supervisor.supervisorId : null;
+        }
 
-      const rootNodeToDisplay: EmployeeNode = {
-        ...rootEmployee,
-        supervisorName: supervisor ? supervisor.employeeName : undefined,
-        children: children,
-        level: originalLevel,
-        directReportCount: children.length,
-        totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
-      };
-      return [rootNodeToDisplay];
+        const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1);
+        const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
+
+        const rootNodeToDisplay: EmployeeNode = {
+          ...rootEmployee,
+          supervisorName: supervisor ? supervisor.employeeName : undefined,
+          children: children,
+          level: originalLevel,
+          directReportCount: children.length,
+          totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
+        };
+        return [rootNodeToDisplay];
+      }
     }
   }, [employees, searchTerm, viewStack, filteredEmployeeIds]);
 
@@ -255,14 +283,12 @@ export default function OrgWeaverPage() {
     setEmployees(prev => {
       const existingIndex = prev.findIndex(e => e.id === newEmployee.id);
       if (existingIndex > -1) {
-        // This is an update of an existing employee if ID matches
         const updated = [...prev];
         updated[existingIndex] = newEmployee;
         toast({ title: 'Employee Updated', description: `${newEmployee.employeeName} has been updated.` });
         triggerReorganizationSummary(originalEmployeesForSummary || [], updated);
         return updated;
       }
-      // This is adding a new employee
       toast({ title: 'Employee Added', description: `${newEmployee.employeeName} has been added.` });
       triggerReorganizationSummary(originalEmployeesForSummary || [], [...prev, newEmployee]);
       return [...prev, newEmployee];
@@ -291,8 +317,10 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prevStack => { // Adjust viewStack if the deleted node was part of it
+    setViewStack(prevStack => {
         const newStack = prevStack.filter(id => id !== employeeId);
+        // If the deleted node was the current root of the drill-down,
+        // select its parent if possible, otherwise clear selection.
         if (selectedNodeId === employeeId && newStack.length > 0) {
             setSelectedNodeId(newStack[newStack.length -1]);
         } else if (selectedNodeId === employeeId) {
@@ -300,7 +328,7 @@ export default function OrgWeaverPage() {
         }
         return newStack;
     });
-    if (selectedNodeId === employeeId) setSelectedNodeId(null); // Ensure selection is cleared if deleted node was selected
+    // setSelectedNodeId(null); // Clear selection if the deleted node was selected
     
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been handled.` });
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
@@ -311,10 +339,13 @@ export default function OrgWeaverPage() {
     const targetEmployee = employees.find(e => e.id === nodeId);
 
     if (targetEmployee) {
-      const hasChildren = employees.some(e => e.supervisorId === nodeId);
+      const hasChildren = searchTerm.trim() 
+        ? currentViewNodes.find(n => n.id === nodeId)?.children?.length > 0
+        : employees.some(e => e.supervisorId === nodeId);
+
       const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
 
-      if (hasChildren && !isCurrentRoot && !searchTerm.trim()) {
+      if (hasChildren && !isCurrentRoot) {
         setViewStack(prevStack => [...prevStack, nodeId]);
       }
     }
@@ -327,15 +358,18 @@ export default function OrgWeaverPage() {
 
 
   const handleGoUp = () => {
-    if (searchTerm.trim()) {
-        setSearchTerm('');
-        setViewStack([]);
-        setSelectedNodeId(null);
-    } else {
-        const newStack = viewStack.slice(0, -1);
-        setViewStack(newStack);
-        setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
+    // If searching and drilled down, go up within search results
+    // If searching and at top of search results, clearing search acts as "go up"
+    if (searchTerm.trim() && viewStack.length === 0) {
+        setSearchTerm(''); // This will trigger useEffect to clear viewStack
+        // setSelectedNodeId(null); // Done by useEffect
+        return;
     }
+    
+    // Standard go up logic (works for both normal and search-drilldown)
+    const newStack = viewStack.slice(0, -1);
+    setViewStack(newStack);
+    setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
   };
 
 
@@ -345,7 +379,7 @@ export default function OrgWeaverPage() {
       const jobsCovered = Array.from(new Set(revised.map(e => e.jobName || 'N/A').filter(Boolean)));
       setReorgSummary({
         summary: "Initial organization structure loaded or no previous version for comparison.",
-        costChange: currentCost, // Show current cost as 'change' from 0
+        costChange: currentCost,
         jobsAdded: jobsCovered,
         jobsRemoved: [],
         jobsCovered: jobsCovered,
@@ -382,7 +416,7 @@ export default function OrgWeaverPage() {
     setAiModalOpen(true);
     try {
       const currentHierarchyJson = JSON.stringify(employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp));
-      const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs."; // Example goals
+      const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs.";
       const recommendations = await recommendHierarchyOptimizations({
         organizationHierarchy: currentHierarchyJson,
         organizationalGoals,
@@ -398,8 +432,6 @@ export default function OrgWeaverPage() {
   };
   
   const handleSaveVersion = () => {
-    // This is a placeholder for actual save functionality.
-    // In a real app, this would likely involve API calls to a backend.
     localStorage.setItem(`orgWeaverVersion_${new Date().toISOString()}`, JSON.stringify(employees));
     toast({
       title: "Version Saved",
@@ -411,7 +443,8 @@ export default function OrgWeaverPage() {
     window.print();
   };
 
-  const canGoUp = searchTerm.trim() !== '' || viewStack.length > 0;
+  const canGoUp = viewStack.length > 0 || (searchTerm.trim() !== '' && viewStack.length === 0);
+
 
   return (
     <SidebarProvider defaultOpen>
@@ -620,7 +653,7 @@ export default function OrgWeaverPage() {
           isOpen={isEditModalOpen}
           onClose={() => {
             setEditModalOpen(false);
-            setSelectedNodeId(null); // Clear selection when modal closes
+            setSelectedNodeId(null);
           }}
           employee={currentEditingEmployee}
           allEmployees={employees}
@@ -630,3 +663,5 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+
+    
