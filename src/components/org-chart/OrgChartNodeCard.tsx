@@ -1,14 +1,17 @@
+
 import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Briefcase, MapPin, DollarSign, Hash, UserCheck, ShieldAlert, Building } from 'lucide-react';
 import { ALL_DISPLAY_ATTRIBUTES } from '@/types/org-chart';
+import { cn } from '@/lib/utils';
 
 interface OrgChartNodeCardProps {
   node: EmployeeNode;
   selectedAttributes: DisplayAttributeKey[];
   onSelectNode?: (nodeId: string) => void;
   isSelected?: boolean;
+  className?: string;
 }
 
 const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = {
@@ -25,7 +28,7 @@ const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = 
 };
 
 
-export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, isSelected }: OrgChartNodeCardProps) {
+export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, isSelected, className }: OrgChartNodeCardProps) {
   const cardStyle = isSelected ? { borderColor: 'hsl(var(--primary))', borderWidth: '2px' } : {};
 
   const getDisplayValue = (attrKey: DisplayAttributeKey): string | number | undefined => {
@@ -40,28 +43,34 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, isSel
 
   return (
     <Card 
-      className={`mb-2 shadow-md hover:shadow-lg transition-shadow duration-200 ${onSelectNode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`}
+      className={cn(
+        `mb-1 shadow-sm hover:shadow-lg transition-shadow duration-200 w-full ${onSelectNode ? 'cursor-pointer' : ''} ${isSelected ? 'ring-2 ring-primary' : ''}`,
+        className
+      )}
       style={cardStyle}
       onClick={onSelectNode ? () => onSelectNode(node.id) : undefined}
       aria-selected={isSelected}
     >
-      <CardHeader className="p-4">
-        <CardTitle className="text-lg flex items-center">
-          <Briefcase className="mr-2 h-5 w-5 text-primary" />
-          {node.employeeName}
+      <CardHeader className="p-2">
+        <CardTitle className="text-base flex items-center">
+          <Briefcase className="mr-1.5 h-4 w-4 text-primary shrink-0" />
+          <span className="truncate" title={node.employeeName}>{node.employeeName}</span>
         </CardTitle>
-        <CardDescription>{node.positionTitle}</CardDescription>
+        <CardDescription className="text-xs truncate" title={node.positionTitle}>{node.positionTitle}</CardDescription>
       </CardHeader>
-      <CardContent className="p-4 pt-0 text-sm space-y-1">
+      <CardContent className="p-2 pt-0 text-xs space-y-0.5">
         {selectedAttributes.map((attrKey) => {
           const value = getDisplayValue(attrKey);
           if (value === undefined || value === null || value === '') return null;
+          // Do not display name and title again as they are in the header
+          if (attrKey === 'employeeName' || attrKey === 'positionTitle') return null;
+
           const Icon = attributeIcons[attrKey];
           return (
-            <div key={attrKey} className="flex items-center text-muted-foreground">
-              {Icon && <Icon className="mr-2 h-4 w-4" />}
-              <span className="font-medium text-foreground/80">{ALL_DISPLAY_ATTRIBUTES[attrKey]}: </span>
-              <span className="ml-1">
+            <div key={attrKey} className="flex items-center text-muted-foreground truncate">
+              {Icon && <Icon className="mr-1.5 h-3 w-3 shrink-0" />}
+              <span className="font-medium text-foreground/80 whitespace-nowrap">{ALL_DISPLAY_ATTRIBUTES[attrKey]}: </span>
+              <span className="ml-1 truncate" title={String(value)}>
                 {attrKey === 'proformaCost' && typeof value === 'number'
                   ? `$${value.toLocaleString()}`
                   : String(value)}
@@ -69,10 +78,11 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, isSel
             </div>
           );
         })}
-        {node.department && (
-          <Badge variant="secondary" className="mt-2">{node.department}</Badge>
+        {node.department && !selectedAttributes.includes('department') && ( // Show department badge if not already listed
+          <Badge variant="secondary" className="mt-1 text-xs py-0 px-1">{node.department}</Badge>
         )}
       </CardContent>
     </Card>
   );
 }
+

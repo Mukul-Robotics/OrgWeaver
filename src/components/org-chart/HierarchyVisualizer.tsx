@@ -1,3 +1,4 @@
+
 import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
 import { OrgChartNodeCard } from './OrgChartNodeCard';
 
@@ -24,24 +25,24 @@ export function HierarchyVisualizer({
     );
   }
 
-  const renderNode = (node: EmployeeNode, level: number) => (
-    <li key={node.id} className="list-none" style={{ marginLeft: `${level > 0 ? 2 : 0}rem` }}>
-      {level > 0 && (
-         <div className="absolute -left-4 top-1/2 h-full w-4 -translate-y-1/2">
-           <div className="h-1/2 w-px bg-border"></div>
-           <div className="h-px w-full bg-border"></div>
-         </div>
-      )}
-      <div className="relative">
+  const renderNode = (node: EmployeeNode, _level: number) => (
+    <li 
+      key={node.id} 
+      className="list-none flex-shrink-0 flex-grow-0 basis-full sm:basis-[calc(50%-0.25rem)] md:basis-[calc(33.3333%-0.3333rem)] lg:basis-[calc(25%-0.375rem)]"
+      // 0.5rem gap = 0.25rem per side for 2 items, 0.3333rem for 3, 0.375rem for 4
+    >
+      <div className="relative h-full"> {/* Ensures card and its children layout correctly */}
         <OrgChartNodeCard
             node={node}
             selectedAttributes={selectedAttributes}
             onSelectNode={onSelectNode}
             isSelected={selectedNodeId === node.id}
+            className="h-full" // Make card take full height of li for alignment
         />
         {node.children && node.children.length > 0 && (
-          <ul className="pl-4 border-l border-dashed border-gray-300">
-            {node.children.map(child => renderNode(child, level + 1))}
+          <ul className="flex flex-wrap gap-2 mt-2 pl-3 border-l-2 border-border"> 
+            {/* Child UL now uses flex-wrap. pl-3 and border-l for visual nesting */}
+            {node.children.map(child => renderNode(child, _level + 1))}
           </ul>
         )}
       </div>
@@ -49,10 +50,11 @@ export function HierarchyVisualizer({
   );
 
   return (
-    <div className="p-4 md:p-6 overflow-auto h-full">
-      <ul className="space-y-4">
+    <div className="p-2 md:p-4 overflow-auto h-full"> {/* Reduced padding */}
+      <ul className="flex flex-wrap gap-2"> {/* Top-level UL uses flex-wrap */}
         {nodes.map(node => renderNode(node, node.level ?? 0))}
       </ul>
     </div>
   );
 }
+
