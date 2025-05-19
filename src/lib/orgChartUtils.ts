@@ -26,6 +26,10 @@ export function buildHierarchyTree(
       });
     }
   });
+
+  // Sort children by employee name alphabetically
+  tree.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
   return tree;
 }
 
