@@ -1,3 +1,4 @@
+
 export interface Employee {
   id: string; // Employee number, must be unique
   employeeName: string;
@@ -13,12 +14,12 @@ export interface Employee {
 export interface EmployeeNode extends Employee {
   children: EmployeeNode[];
   // For display convenience, can be populated when building the tree
-  supervisorName?: string; 
+  supervisorName?: string;
   level?: number; // For indentation/styling in the visualizer
 }
 
 // Defines which attributes can be selected for display in the org chart nodes
-export type DisplayAttributeKey = 
+export type DisplayAttributeKey =
   | 'employeeNumber' // alias for id
   | 'employeeName'
   | 'supervisorId' // raw supervisor id
@@ -69,3 +70,15 @@ export interface AiRecommendationsData {
   summary: string;
   recommendations: AiRecommendation[];
 }
+
+export type PageSize = 'fitToScreen' | 'a4Portrait' | 'a4Landscape' | 'letterPortrait' | 'letterLandscape';
+
+export const PAGE_SIZE_OPTIONS: { value: PageSize, label: string }[] = [
+  { value: 'fitToScreen', label: 'Fit to Screen' },
+  { value: 'a4Portrait', label: 'A4 Portrait (210x297mm)' },
+  { value: 'a4Landscape', label: 'A4 Landscape (297x210mm)' },
+  { value: 'letterPortrait', label: 'Letter Portrait (8.5x11in)' },
+  { value: 'letterLandscape', label: 'Letter Landscape (11x8.5in)' },
+];
+
+export const DEFAULT_PAGE_SIZE: PageSize = 'fitToScreen';

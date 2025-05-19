@@ -24,15 +24,23 @@ import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsMod
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
 
-import type { Employee, EmployeeNode, DisplayAttributeKey, ReorganizationSummaryData, AiRecommendationsData } from '@/types/org-chart';
-import { DEFAULT_DISPLAY_ATTRIBUTES } from '@/types/org-chart';
+import type { Employee, EmployeeNode, DisplayAttributeKey, ReorganizationSummaryData, AiRecommendationsData, PageSize } from '@/types/org-chart';
+import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/types/org-chart';
 import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } from '@/lib/orgChartUtils';
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, LayoutPanelLeft } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,16 +69,17 @@ export default function OrgWeaverPage() {
   const [employees, setEmployees] = useState<Employee[]>(initialSampleEmployees);
   const [originalEmployeesForSummary, setOriginalEmployeesForSummary] = useState<Employee[] | null>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<DisplayAttributeKey[]>(DEFAULT_DISPLAY_ATTRIBUTES);
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isExportModalOpen, setExportModalOpen] = useState(false);
   const [isAiModalOpen, setAiModalOpen] = useState(false);
   const [isSummaryModalOpen, setSummaryModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
-  
+
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendationsData | null>(null);
   const [reorgSummary, setReorgSummary] = useState<ReorganizationSummaryData | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
-  
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
 
@@ -111,7 +120,7 @@ export default function OrgWeaverPage() {
     setSidebarView('controls');
     triggerReorganizationSummary(originalEmployeesForSummary || [], [...employees, newEmployee]);
   };
-  
+
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
@@ -198,7 +207,7 @@ export default function OrgWeaverPage() {
       setIsLoadingAi(false);
     }
   };
-  
+
   const handleSaveVersion = () => {
     // Currently, "Save Version" means download current state as JSON
     if (employees.length === 0) {
@@ -223,7 +232,7 @@ export default function OrgWeaverPage() {
     setSelectedNodeId(nodeId);
     setEditModalOpen(true);
   };
-  
+
   const handlePrintChart = () => {
     if (employees.length === 0) {
       toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
@@ -231,8 +240,19 @@ export default function OrgWeaverPage() {
     }
     // This standard browser function should open the print dialog.
     // The actual printing to PDF/Paper is handled by the browser's print UI.
-    window.print();
+    // Check browser console if dialog doesn't appear (might be due to sandboxing in dev envs)
+    try {
+      window.print();
+    } catch (error) {
+      console.error("Print error:", error);
+      toast({ title: 'Print Error', description: 'Could not open print dialog. Check browser console.', variant: 'destructive'});
+    }
   };
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(value as PageSize);
+  };
+
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -270,6 +290,21 @@ export default function OrgWeaverPage() {
                     <SidebarGroup>
                        <SidebarGroupLabel className="flex items-center"><Sparkles className="mr-2 h-4 w-4"/>Display Options</SidebarGroupLabel>
                       <AttributeSelector selectedAttributes={selectedAttributes} onSelectionChange={setSelectedAttributes} />
+                      <div className="mt-3 space-y-1">
+                        <Label htmlFor="pageSizeSelector" className="text-sm font-medium">Page Size</Label>
+                        <Select value={pageSize} onValueChange={handlePageSizeChange}>
+                          <SelectTrigger id="pageSizeSelector" className="w-full">
+                            <SelectValue placeholder="Select page size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PAGE_SIZE_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </SidebarGroup>
                     <Separator className="my-4" />
                     <SidebarGroup>
@@ -306,11 +341,12 @@ export default function OrgWeaverPage() {
 
           <SidebarInset className="flex-1 flex flex-col">
             <main className="flex-1 p-0 overflow-hidden"> {/* Removed padding for visualizer to control its own */}
-              <HierarchyVisualizer 
-                nodes={hierarchyTree} 
+              <HierarchyVisualizer
+                nodes={hierarchyTree}
                 selectedAttributes={selectedAttributes}
                 onSelectNode={handleSelectNodeForEdit}
                 selectedNodeId={selectedNodeId}
+                pageSize={pageSize}
               />
             </main>
           </SidebarInset>
@@ -321,9 +357,9 @@ export default function OrgWeaverPage() {
       <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees} fileNamePrefix="orgweaver_export"/>
       <AiRecommendationsModal isOpen={isAiModalOpen} onClose={() => setAiModalOpen(false)} recommendationsData={aiRecommendations} isLoading={isLoadingAi} />
       <ReorganizationSummaryModal isOpen={isSummaryModalOpen} onClose={() => setSummaryModalOpen(false)} summaryData={reorgSummary} isLoading={isLoadingAi} />
-      
+
       {currentEditingEmployee && (
-        <EditEmployeeModal 
+        <EditEmployeeModal
             isOpen={isEditModalOpen}
             onClose={() => { setEditModalOpen(false); setSelectedNodeId(null); }}
             employee={currentEditingEmployee}
@@ -343,7 +379,7 @@ export default function OrgWeaverPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will delete "{employees.find(e => e.id === selectedNodeId)?.employeeName}". 
+                This action will delete "{employees.find(e => e.id === selectedNodeId)?.employeeName}".
                 Direct reports will be reassigned to this employee's supervisor or become top-level. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -358,4 +394,3 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
-

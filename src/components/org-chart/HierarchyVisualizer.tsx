@@ -1,5 +1,5 @@
 
-import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
+import type { EmployeeNode, DisplayAttributeKey, PageSize } from '@/types/org-chart';
 import { OrgChartNodeCard } from './OrgChartNodeCard';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,7 @@ interface HierarchyVisualizerProps {
   selectedAttributes: DisplayAttributeKey[];
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
+  pageSize: PageSize; // New prop
 }
 
 // Define an array of border color classes for nesting indication - currently unused due to line removal
@@ -28,7 +29,12 @@ export function HierarchyVisualizer({
   selectedAttributes,
   onSelectNode,
   selectedNodeId,
+  pageSize, // Consuming the new prop
 }: HierarchyVisualizerProps) {
+
+  // TODO: In a future step, use `pageSize` to adjust the container styles.
+  // For now, we'll log it to show it's being received.
+  // console.log("Current Page Size:", pageSize);
 
   const renderEmployeeSegment = (node: EmployeeNode, level: number): JSX.Element => {
     return (
@@ -84,6 +90,7 @@ export function HierarchyVisualizer({
     );
   }
 
+  // TODO: Wrap this in a container that responds to `pageSize`
   return (
     <div className="p-1 md:p-2 overflow-auto h-full bg-background">
       {/* Render each top-level node; they will stack vertically by default */}
