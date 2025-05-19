@@ -54,7 +54,7 @@ export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'positionTitle',
   'department',
   'proformaCost',
-  'employeeCategory',
+  'employeeCategory', // Added Employee Category here
 ];
 
 export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [

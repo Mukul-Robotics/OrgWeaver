@@ -13,7 +13,7 @@ interface OrgChartNodeCardProps {
   onEditClick?: (nodeId: string) => void;
   isSelected?: boolean;
   className?: string;
-  hasChildren?: boolean; // This prop was part of a previous iteration, ensure it's used or removed if no longer needed by current drill-down logic
+  hasChildren?: boolean; 
 }
 
 const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = {
@@ -27,7 +27,7 @@ const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = 
   location: MapPin,
   proformaCost: DollarSign,
   grade: Users,
-  employeeCategory: Tag, // Added icon for Employee Category
+  employeeCategory: Tag, 
 };
 
 const categoryBorderColors: Record<string, string> = {
@@ -35,17 +35,23 @@ const categoryBorderColors: Record<string, string> = {
   'Manager': 'border-blue-500',
   'Individual Contributor': 'border-green-500',
   'Support Staff': 'border-yellow-500',
-  // Add more categories and colors as needed
+  'PSA': 'border-orange-500',
+  'LSC': 'border-teal-500',
+  'Intern': 'border-pink-500',
+  'IndividualConsultant': 'border-cyan-500',
+  'Fellow': 'border-indigo-500',
+  'Employee': 'border-gray-400',
 };
 
 export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className }: OrgChartNodeCardProps) {
-  const categoryBorderClass = node.employeeCategory ? categoryBorderColors[node.employeeCategory] : '';
+  const categoryBorderClass = node.employeeCategory && categoryBorderColors[node.employeeCategory] 
+    ? categoryBorderColors[node.employeeCategory] 
+    : 'border-border'; // Default border if category not in map or undefined
 
   const getDisplayValue = (attrKey: DisplayAttributeKey): string | number | undefined => {
     if (attrKey === 'employeeNumber') return node.id;
-    // Do not display supervisorId if supervisorName is selected and available, or if supervisorId is null (handled by check below)
     if (attrKey === 'supervisorId' && (selectedAttributes.includes('supervisorName') && node.supervisorName)) return undefined;
-    if (attrKey === 'supervisorId' && !node.supervisorId) return undefined; // Don't show if null
+    if (attrKey === 'supervisorId' && !node.supervisorId) return undefined; 
     return node[attrKey as keyof EmployeeNode];
   }
 
@@ -56,10 +62,10 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
   return (
     <Card
       className={cn(
-        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full flex flex-col h-[160px]`,
+        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full flex flex-col h-[160px]`, // Fixed height
         onSelectNode ? 'cursor-pointer' : '',
-        isSelected ? 'ring-2 ring-primary' : 'border-border', // Default border, can be overridden by categoryBorderClass
-        categoryBorderClass, // Apply category-specific border color
+        isSelected ? 'ring-2 ring-primary' : '', 
+        categoryBorderClass, 
         className
       )}
       onClick={onSelectNode ? () => onSelectNode(node.id) : undefined}
@@ -90,16 +96,13 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
         </div>
         <CardDescription className="text-xs truncate" title={node.positionTitle}>{node.positionTitle}</CardDescription>
       </CardHeader>
-      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5 flex-1 overflow-y-auto flex flex-col">
-        <div className="flex-grow">
+      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5 flex-1 overflow-y-auto flex flex-col"> {/* Flex column and scroll */}
+        <div className="flex-grow"> {/* This div will grow to take available space */}
           {selectedAttributes.map((attrKey) => {
             const value = getDisplayValue(attrKey);
             if (value === undefined || value === null || value === '') return null;
-            // These are already displayed in CardHeader or implicitly (like ID)
             if (attrKey === 'employeeName' || attrKey === 'positionTitle') return null;
-            // Only show employeeNumber if explicitly selected AND it's not just repeating the ID (which is always available to the component)
-            if (attrKey === 'employeeNumber' && !ALL_DISPLAY_ATTRIBUTES[attrKey]) return null;
-
+            if (attrKey === 'employeeNumber' && node.id === value) return null; // Don't show if it's just the ID
 
             const Icon = attributeIcons[attrKey];
             return (
@@ -119,7 +122,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
           )}
         </div>
         {hasReports && (
-          <div className="mt-auto pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1">
+          <div className="mt-auto pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1"> {/* Pushed to bottom */}
             <Users2 className="h-3 w-3" />
             <span title="Direct Reports">D:{node.directReportCount ?? 0}</span>
             <span>/</span>
