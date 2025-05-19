@@ -1,6 +1,7 @@
 
 import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
 import { OrgChartNodeCard } from './OrgChartNodeCard';
+import { cn } from '@/lib/utils';
 
 interface HierarchyVisualizerProps {
   nodes: EmployeeNode[];
@@ -8,6 +9,16 @@ interface HierarchyVisualizerProps {
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
 }
+
+// Define an array of border color classes to cycle through for hierarchy lines
+const lineColors = [
+  'border-primary',        // Color for lines from level 0 parents to level 1 children
+  'border-accent',         // Color for lines from level 1 parents to level 2 children
+  'border-destructive/70', // Color for lines from level 2 parents to level 3 children
+  'border-yellow-500',     // Color for lines from level 3 parents to level 4 children
+  'border-green-500',      // Color for lines from level 4 parents to level 5 children
+  // Add more colors if deeper nesting is common, or it will cycle through these
+];
 
 export function HierarchyVisualizer({
   nodes,
@@ -25,30 +36,42 @@ export function HierarchyVisualizer({
     );
   }
 
-  const renderNode = (node: EmployeeNode, _level: number) => (
-    <li
-      key={node.id}
-      className="list-none flex-shrink-0 flex-grow-0 basis-full xs:basis-[calc(50%-0.25rem)] sm:basis-[calc(33.3333%-0.333rem)] lg:basis-[calc(25%-0.375rem)] xl:basis-[calc(20%-0.4rem)]"
-    >
-      <div className="relative">
-        <OrgChartNodeCard
-            node={node}
-            selectedAttributes={selectedAttributes}
-            onSelectNode={onSelectNode}
-            isSelected={selectedNodeId === node.id}
-        />
-        {node.children && node.children.length > 0 && (
-          <ul className="flex flex-wrap justify-center gap-2 mt-2 pl-2 border-l-2 border-border">
-            {node.children.map(child => renderNode(child, _level + 1))}
-          </ul>
-        )}
-      </div>
-    </li>
-  );
+  // The `currentLevel` parameter represents the depth of the current `node`.
+  // The line connecting this `node` (parent) to its children's group will be colored based on this `currentLevel`.
+  const renderNode = (node: EmployeeNode, currentLevel: number) => {
+    const lineColorClass = lineColors[currentLevel % lineColors.length];
+
+    return (
+      <li
+        key={node.id}
+        className="list-none flex-shrink-0 flex-grow-0 basis-full xs:basis-[calc(50%-0.25rem)] sm:basis-[calc(33.3333%-0.333rem)] lg:basis-[calc(25%-0.375rem)] xl:basis-[calc(20%-0.4rem)]"
+      >
+        <div className="relative">
+          <OrgChartNodeCard
+              node={node}
+              selectedAttributes={selectedAttributes}
+              onSelectNode={onSelectNode}
+              isSelected={selectedNodeId === node.id}
+          />
+          {node.children && node.children.length > 0 && (
+            <ul className={cn(
+              "flex flex-wrap justify-center gap-2 mt-2 pl-2 border-l-2",
+              lineColorClass // Apply dynamic color based on the parent's level
+            )}>
+              {node.children.map(child => renderNode(child, currentLevel + 1))}
+            </ul>
+          )}
+        </div>
+      </li>
+    );
+  };
 
   return (
     <div className="p-1 md:p-2 overflow-auto h-full bg-background">
       <ul className="flex flex-wrap justify-center gap-2">
+        {/* Initial call: for top-level nodes, their level is `node.level ?? 0`.
+            The `currentLevel` passed to `renderNode` is the level of the node itself.
+        */}
         {nodes.map(node => renderNode(node, node.level ?? 0))}
       </ul>
     </div>
