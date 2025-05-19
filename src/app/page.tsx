@@ -12,7 +12,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarTrigger,
-  SidebarInput, // Added SidebarInput
+  SidebarInput,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -31,7 +31,7 @@ import { buildHierarchyTree, calculateTotalProformaCost } from '@/lib/orgChartUt
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react'; // Added SearchIcon
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -124,20 +124,29 @@ export default function OrgWeaverPage() {
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
     if (!currentRootId) {
-      return buildHierarchyTree(sourceEmployees, null, 0);
+      // Sort top-level employees alphabetically by name
+      const topLevelEmployees = sourceEmployees.filter(e => !e.supervisorId);
+      topLevelEmployees.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+      
+      return topLevelEmployees.map(emp => buildHierarchyTree(sourceEmployees, emp.id, 0)[0]).filter(Boolean);
+
     } else {
       const rootEmployee = sourceEmployees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
         setViewStack([]); // Reset stack if root employee not found in current source
-        return buildHierarchyTree(sourceEmployees, null, 0);
+         // Sort top-level employees alphabetically by name if resetting
+        const topLevelEmployees = sourceEmployees.filter(e => !e.supervisorId);
+        topLevelEmployees.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+        return topLevelEmployees.map(emp => buildHierarchyTree(sourceEmployees, emp.id, 0)[0]).filter(Boolean);
       }
       // Find the original level of the rootEmployee in the *unfiltered* hierarchy to maintain consistency
-      // This is a simplified approach; a more robust solution might store levels more centrally
       let originalLevel = 0;
       let tempSupervisorId = rootEmployee.supervisorId;
+      const allEmployeesMap = new Map(employees.map(e => [e.id, e])); // Use all employees for level calculation
+
       while(tempSupervisorId) {
         originalLevel++;
-        const supervisor = employees.find(e => e.id === tempSupervisorId);
+        const supervisor = allEmployeesMap.get(tempSupervisorId);
         tempSupervisorId = supervisor ? supervisor.supervisorId : null;
       }
 
@@ -493,5 +502,7 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+
+    
 
     
