@@ -44,7 +44,19 @@ export function HierarchyVisualizer({
     return (
       <li
         key={node.id}
-        className="list-none flex-shrink-0 flex-grow-0 basis-full xs:basis-[calc(50%-0.25rem)] sm:basis-[calc(33.3333%-0.333rem)] lg:basis-[calc(25%-0.375rem)] xl:basis-[calc(20%-0.4rem)]"
+        className={cn(
+          "list-none flex-shrink-0 flex-grow-0",
+          // Default: 2 items per row. Adjust gap compensation if gap changes from gap-2 (0.5rem)
+          "basis-[calc(50%-0.25rem)]", 
+          // sm: 3 items per row. 0.5rem * 2 gaps / 3 items = 0.333rem per item
+          "sm:basis-[calc(33.3333%-0.333rem)]",
+          // md: 4 items per row. 0.5rem * 3 gaps / 4 items = 0.375rem per item
+          "md:basis-[calc(25%-0.375rem)]",
+          // lg: 5 items per row. 0.5rem * 4 gaps / 5 items = 0.4rem per item
+          "lg:basis-[calc(20%-0.4rem)]",
+          // xl: 6 items per row. 0.5rem * 5 gaps / 6 items = 0.416rem per item
+          "xl:basis-[calc(16.666%-0.416rem)]"
+        )}
       >
         <div className="relative">
           <OrgChartNodeCard
@@ -69,9 +81,6 @@ export function HierarchyVisualizer({
   return (
     <div className="p-1 md:p-2 overflow-auto h-full bg-background">
       <ul className="flex flex-wrap justify-center gap-2">
-        {/* Initial call: for top-level nodes, their level is `node.level ?? 0`.
-            The `currentLevel` passed to `renderNode` is the level of the node itself.
-        */}
         {nodes.map(node => renderNode(node, node.level ?? 0))}
       </ul>
     </div>
