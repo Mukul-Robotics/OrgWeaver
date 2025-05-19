@@ -2,76 +2,63 @@
 import type { EmployeeNode, DisplayAttributeKey, PageSize } from '@/types/org-chart';
 import { OrgChartNodeCard } from './OrgChartNodeCard';
 import { cn } from '@/lib/utils';
+import React from 'react'; // Import React for useMemo
 
 interface HierarchyVisualizerProps {
   nodes: EmployeeNode[];
   selectedAttributes: DisplayAttributeKey[];
   onSelectNode?: (nodeId: string) => void;
   selectedNodeId?: string | null;
-  pageSize: PageSize; // New prop
+  pageSize: PageSize;
 }
 
-// Define an array of border color classes for nesting indication - currently unused due to line removal
-// const levelColors = [
-//   'border-primary/50',
-//   'border-accent/50',
-//   'border-destructive/30',
-//   'border-yellow-500/50',
-//   'border-green-500/50',
-//   'border-blue-500/50',
-//   'border-indigo-500/50',
-//   'border-purple-500/50',
-//   'border-pink-500/50',
-// ];
+const PAGE_DIMENSIONS: Record<Exclude<PageSize, 'fitToScreen'>, { width: string; height: string }> = {
+  a4Portrait: { width: '794px', height: '1123px' },    // 210mm x 297mm @ ~96DPI
+  a4Landscape: { width: '1123px', height: '794px' },   // 297mm x 210mm @ ~96DPI
+  letterPortrait: { width: '816px', height: '1056px' }, // 8.5in x 11in @ ~96DPI
+  letterLandscape: { width: '1056px', height: '816px' },// 11in x 8.5in @ ~96DPI
+};
 
 export function HierarchyVisualizer({
   nodes,
   selectedAttributes,
   onSelectNode,
   selectedNodeId,
-  pageSize, // Consuming the new prop
+  pageSize,
 }: HierarchyVisualizerProps) {
 
-  // TODO: In a future step, use `pageSize` to adjust the container styles.
-  // For now, we'll log it to show it's being received.
-  // console.log("Current Page Size:", pageSize);
+  const visualizerStyle = React.useMemo(() => {
+    if (pageSize === 'fitToScreen') {
+      return { width: '100%', height: '100%' };
+    }
+    return PAGE_DIMENSIONS[pageSize] || { width: '100%', height: '100%' };
+  }, [pageSize]);
 
   const renderEmployeeSegment = (node: EmployeeNode, level: number): JSX.Element => {
     return (
-      // Container for a single employee and their direct reports' section
       <div key={node.id} className="mb-4 w-full">
         <OrgChartNodeCard
           node={node}
           selectedAttributes={selectedAttributes}
           onSelectNode={onSelectNode}
           isSelected={selectedNodeId === node.id}
-          className="mb-2" // Add some margin below the card itself
+          className="mb-2"
         />
         {node.children && node.children.length > 0 && (
-          // Container for the direct reports (children)
-          // This will be a flex container to arrange children in columns
-          // Hierarchy line styling (ml-4, pl-3, border-l-2, levelColors) has been removed to test layout
           <div className={cn(
-            "mt-1 flex flex-wrap justify-center -mx-2", // Negative margin for x-axis gap control
-            // levelColors[level % levelColors.length], // Line color removed
-            "gap-y-2" // Vertical gap for wrapped items
+            "mt-1 flex flex-wrap justify-center -mx-2",
+            "gap-y-2" 
           )}>
             {node.children.map(child => (
-              // Each child is a column item with responsive width and padding for gaps
               <div key={child.id} className={cn(
-                "flex-shrink-0 flex-grow-0 px-2", // Horizontal padding to create gaps
-                // Default: 2 items per row (mobile-first approach)
+                "flex-shrink-0 flex-grow-0 px-2",
                 "basis-1/2",
-                 // sm: 3 items per row.
                 "sm:basis-1/3",
-                // md: 4 items per row.
                 "md:basis-1/4",
-                 // lg: 5 items per row.
                 "lg:basis-1/5",
-                 // xl: 6 items per row
                 "xl:basis-1/6"
               )}>
-                {renderEmployeeSegment(child, level + 1)} {/* Recursive call for the child */}
+                {renderEmployeeSegment(child, level + 1)}
               </div>
             ))}
           </div>
@@ -90,10 +77,15 @@ export function HierarchyVisualizer({
     );
   }
 
-  // TODO: Wrap this in a container that responds to `pageSize`
   return (
-    <div className="p-1 md:p-2 overflow-auto h-full bg-background">
-      {/* Render each top-level node; they will stack vertically by default */}
+    <div 
+      style={visualizerStyle}
+      className={cn(
+        "p-1 md:p-2 overflow-auto bg-background mx-auto", // Added mx-auto to center if smaller than container
+        pageSize === 'fitToScreen' ? 'h-full w-full' : 'shadow-lg border my-4' // ensure h-full for fitToScreen, add border/shadow for fixed
+      )}
+      id="hierarchy-visualizer-container" // Added an ID for potential print CSS targeting
+    >
       {nodes.map(node => renderEmployeeSegment(node, node.level ?? 0))}
     </div>
   );
