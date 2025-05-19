@@ -58,7 +58,7 @@ export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
 ];
 
 export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
-  { value: "Employee", label: "Employee" },
+  { value: "Staff", label: "Staff" },
   { value: "PSA", label: "PSA (Professional Services)" },
   { value: "LSC", label: "LSC (Limited Service Contractor)" },
   { value: "Intern", label: "Intern" },

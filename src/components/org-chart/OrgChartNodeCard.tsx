@@ -34,13 +34,13 @@ const categoryBorderColors: Record<string, string> = {
   'Executive': 'border-purple-500',
   'Manager': 'border-blue-500',
   'Individual Contributor': 'border-green-500',
-  'Support Staff': 'border-yellow-500',
+  'Support Staff': 'border-yellow-500', // Original was yellow, kept for consistency
   'PSA': 'border-orange-500',
   'LSC': 'border-teal-500',
   'Intern': 'border-pink-500',
   'IndividualConsultant': 'border-cyan-500',
   'Fellow': 'border-indigo-500',
-  'Employee': 'border-gray-400',
+  'Staff': 'border-gray-400', // Changed from Employee
 };
 
 export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className }: OrgChartNodeCardProps) {
@@ -102,7 +102,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
             const value = getDisplayValue(attrKey);
             if (value === undefined || value === null || value === '') return null;
             if (attrKey === 'employeeName' || attrKey === 'positionTitle') return null;
-            if (attrKey === 'employeeNumber' && node.id === value) return null; // Don't show if it's just the ID
+            if (attrKey === 'employeeNumber' && node.id === value && !selectedAttributes.includes('employeeNumber')) return null; 
 
             const Icon = attributeIcons[attrKey];
             return (
