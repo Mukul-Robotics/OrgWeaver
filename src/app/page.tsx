@@ -30,7 +30,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } 
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, LayoutPanelLeft } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, LayoutPanelLeft, ArrowUpFromLine } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -82,24 +82,53 @@ export default function OrgWeaverPage() {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
+  const [viewStack, setViewStack] = useState<string[]>([]); // For drill-down
 
   const { toast } = useToast();
 
-  const hierarchyTree = useMemo(() => buildHierarchyTree(employees), [employees]);
+  const currentViewNodes = useMemo(() => {
+    const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+
+    if (!currentRootId) {
+      // Show all top-level employees
+      return buildHierarchyTree(employees, null, 0);
+    } else {
+      // Find the selected employee and make them the root of the view
+      const rootEmployee = employees.find(e => e.id === currentRootId);
+      if (!rootEmployee) {
+        // This might happen if the employee was deleted while being viewed.
+        // Fallback to top level. A more robust solution would validate viewStack.
+        setViewStack([]); // Reset stack
+        return buildHierarchyTree(employees, null, 0);
+      }
+      // Create a single node representing the current root, and populate its children.
+      const children = buildHierarchyTree(employees, rootEmployee.id, (employees.find(e => e.id === currentRootId)?.level || 0) + 1);
+      const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
+
+      const rootNode: EmployeeNode = {
+        ...rootEmployee,
+        supervisorName: supervisor ? supervisor.employeeName : undefined,
+        children: children,
+        level: 0, // This is the root for the current view, so its level is 0 in this context
+      };
+      return [rootNode];
+    }
+  }, [employees, viewStack]);
+
 
   const currentEditingEmployee = useMemo(() => {
-    if (sidebarView === 'editEmployee' && selectedNodeId) {
+    if (selectedNodeId) { // Edit modal can be opened independently of sidebarView
       return employees.find(e => e.id === selectedNodeId) || null;
     }
     return null;
-  }, [employees, selectedNodeId, sidebarView]);
+  }, [employees, selectedNodeId]);
 
 
   const handleImportData = (data: Employee[], fileName: string) => {
-    setOriginalEmployeesForSummary([...employees]); // Save current state before import
+    setOriginalEmployeesForSummary([...employees]);
     setEmployees(data);
+    setViewStack([]); // Reset drill-down on new data import
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
-    // Optionally trigger AI summary if originalEmployeesForSummary was not null
     if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
        triggerReorganizationSummary(originalEmployeesForSummary, data);
     }
@@ -109,12 +138,12 @@ export default function OrgWeaverPage() {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(prev => {
       const existingIndex = prev.findIndex(e => e.id === newEmployee.id);
-      if (existingIndex > -1) { // Update existing
+      if (existingIndex > -1) {
         const updated = [...prev];
         updated[existingIndex] = newEmployee;
         return updated;
       }
-      return [...prev, newEmployee]; // Add new
+      return [...prev, newEmployee];
     });
     toast({ title: 'Employee Added/Updated', description: `${newEmployee.employeeName} has been processed.` });
     setSidebarView('controls');
@@ -123,11 +152,12 @@ export default function OrgWeaverPage() {
 
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
     setOriginalEmployeesForSummary([...employees]);
-    setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
+    const updatedEmployees = employees.map(e => e.id === updatedEmployee.id ? updatedEmployee : e);
+    setEmployees(updatedEmployees);
     toast({ title: 'Employee Updated', description: `${updatedEmployee.employeeName}'s details updated.` });
     setEditModalOpen(false);
-    setSelectedNodeId(null); // Deselect node
-    triggerReorganizationSummary(originalEmployeesForSummary || [], employees.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
+    setSelectedNodeId(null);
+    triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
   const handleDeleteEmployee = (employeeId: string) => {
@@ -135,27 +165,48 @@ export default function OrgWeaverPage() {
     const employeeToDelete = employees.find(e => e.id === employeeId);
     if (!employeeToDelete) return;
 
-    // Reassign direct reports to the deleted employee's supervisor or make them top-level
     const newSupervisorId = employeeToDelete.supervisorId;
     const updatedEmployees = employees
-      .filter(e => e.id !== employeeId) // Remove the employee
-      .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e); // Reassign children
+      .filter(e => e.id !== employeeId)
+      .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been handled.` });
+    setViewStack(prev => prev.filter(id => id !== employeeId)); // Remove from view stack if present
+    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
     setSelectedNodeId(null);
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
+  };
+
+  const handleNodeClick = (nodeId: string) => {
+    setSelectedNodeId(nodeId); // For edit modal
+    setEditModalOpen(true);     // Open edit modal
+
+    // For Drill Down: if node has children and isn't already the current root
+    const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
+    if (!isCurrentRoot) {
+        const nodeToDrill = employees.find(e => e.id === nodeId);
+        if (nodeToDrill) {
+            const hasChildren = employees.some(e => e.supervisorId === nodeId);
+            if (hasChildren) {
+                setViewStack(prevStack => [...prevStack, nodeId]);
+            }
+        }
+    }
+  };
+
+  const handleGoUp = () => {
+    setViewStack(prevStack => prevStack.slice(0, -1));
+    setSelectedNodeId(null); // Deselect node when going up
   };
 
 
   const triggerReorganizationSummary = async (original: Employee[], revised: Employee[]) => {
     if (!original || original.length === 0) {
-      // If there's no original state (e.g. first import), just show current stats
       const currentCost = calculateTotalProformaCost(revised);
-      const jobsCovered = Array.from(new Set(revised.map(e => e.jobName)));
+      const jobsCovered = Array.from(new Set(revised.map(e => e.jobName || 'N/A')));
       setReorgSummary({
         summary: "Initial organization structure loaded.",
-        costChange: currentCost, // Show total cost as "change" from 0
+        costChange: currentCost, 
         jobsAdded: jobsCovered,
         jobsRemoved: [],
         jobsCovered: jobsCovered,
@@ -167,8 +218,8 @@ export default function OrgWeaverPage() {
     setIsLoadingAi(true);
     setSummaryModalOpen(true);
     try {
-      const originalHierarchyJson = JSON.stringify(original);
-      const revisedHierarchyJson = JSON.stringify(revised);
+      const originalHierarchyJson = JSON.stringify(original.map(({children, level, supervisorName, ...emp}) => emp)); // Strip transient props
+      const revisedHierarchyJson = JSON.stringify(revised.map(({children, level, supervisorName, ...emp}) => emp));
       const summary = await summarizeReorganizationImpact({
         originalHierarchy: originalHierarchyJson,
         revisedHierarchy: revisedHierarchyJson,
@@ -191,8 +242,7 @@ export default function OrgWeaverPage() {
     setIsLoadingAi(true);
     setAiModalOpen(true);
     try {
-      const currentHierarchyJson = JSON.stringify(employees);
-      // For simplicity, using a generic goal. In a real app, this could be user input.
+      const currentHierarchyJson = JSON.stringify(employees.map(({children, level, supervisorName, ...emp}) => emp));
       const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs.";
       const recommendations = await recommendHierarchyOptimizations({
         organizationHierarchy: currentHierarchyJson,
@@ -209,12 +259,11 @@ export default function OrgWeaverPage() {
   };
 
   const handleSaveVersion = () => {
-    // Currently, "Save Version" means download current state as JSON
     if (employees.length === 0) {
       toast({ title: 'No Data', description: 'Nothing to save.', variant: 'destructive'});
       return;
     }
-    const dataStr = JSON.stringify(employees, null, 2);
+    const dataStr = JSON.stringify(employees.map(({children, level, supervisorName, ...emp}) => emp), null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -228,13 +277,8 @@ export default function OrgWeaverPage() {
     toast({ title: 'Version Saved', description: 'Current hierarchy downloaded as JSON.'});
   };
 
-  const handleSelectNodeForEdit = (nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    setEditModalOpen(true);
-  };
-
   const handlePrintChart = () => {
-    if (employees.length === 0) {
+    if (currentViewNodes.length === 0) {
       toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
       return;
     }
@@ -254,7 +298,7 @@ export default function OrgWeaverPage() {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full flex-col bg-muted/40">
-        <AppHeader />
+        <AppHeader onGoUp={handleGoUp} canGoUp={viewStack.length > 0} />
         <div className="flex flex-1">
           <Sidebar collapsible="icon" className="hidden border-r bg-background md:flex" side="left">
             <SidebarHeader className="p-2">
@@ -328,7 +372,6 @@ export default function OrgWeaverPage() {
                     <AddEmployeeForm onSubmit={handleAddEmployee} allEmployees={employees} onCancel={() => setSidebarView('controls')} />
                   </SidebarGroup>
                 )}
-                {/* Edit Employee Form could also be here if not using a modal */}
               </SidebarContent>
             </ScrollArea>
             <SidebarFooter>
@@ -337,11 +380,11 @@ export default function OrgWeaverPage() {
           </Sidebar>
 
           <SidebarInset className="flex-1 flex flex-col">
-            <main className="flex-1 p-0 overflow-hidden"> {/* Removed padding for visualizer to control its own */}
+            <main className="flex-1 p-0 overflow-hidden">
               <HierarchyVisualizer
-                nodes={hierarchyTree}
+                nodes={currentViewNodes}
                 selectedAttributes={selectedAttributes}
-                onSelectNode={handleSelectNodeForEdit}
+                onSelectNode={handleNodeClick}
                 selectedNodeId={selectedNodeId}
                 pageSize={pageSize}
               />
@@ -351,7 +394,7 @@ export default function OrgWeaverPage() {
       </div>
 
       <ImportDataModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImport={handleImportData} />
-      <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees} fileNamePrefix="orgweaver_export"/>
+      <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees.map(({children, level, supervisorName, ...emp}) => emp)} fileNamePrefix="orgweaver_export"/>
       <AiRecommendationsModal isOpen={isAiModalOpen} onClose={() => setAiModalOpen(false)} recommendationsData={aiRecommendations} isLoading={isLoadingAi} />
       <ReorganizationSummaryModal isOpen={isSummaryModalOpen} onClose={() => setSummaryModalOpen(false)} summaryData={reorgSummary} isLoading={isLoadingAi} />
 
@@ -387,9 +430,6 @@ export default function OrgWeaverPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-
     </SidebarProvider>
   );
 }
-
-    
