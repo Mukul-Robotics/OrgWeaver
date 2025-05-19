@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { Employee } from '@/types/org-chart';
+import { EMPLOYEE_CATEGORIES } from '@/types/org-chart';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -16,6 +17,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { generateUniqueID } from '@/lib/orgChartUtils';
 
 const employeeFormSchema = z.object({
@@ -28,7 +36,7 @@ const employeeFormSchema = z.object({
   department: z.string().optional(),
   location: z.string().optional(),
   proformaCost: z.coerce.number().min(0, { message: "Proforma cost must be a positive number." }),
-  employeeCategory: z.string().optional(), // Added employee category
+  employeeCategory: z.string().optional(),
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -44,7 +52,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: existingEmployee
-      ? { ...existingEmployee, supervisorId: existingEmployee.supervisorId || null }
+      ? { ...existingEmployee, supervisorId: existingEmployee.supervisorId || null, employeeCategory: existingEmployee.employeeCategory || "" }
       : {
         employeeName: '',
         supervisorId: null,
@@ -54,20 +62,20 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         department: '',
         location: '',
         proformaCost: 0,
-        employeeCategory: '', // Default for new employee
+        employeeCategory: '',
       },
   });
 
   const handleSubmit = (values: EmployeeFormData) => {
     const employeeData: Employee = {
       ...values,
-      id: existingEmployee?.id || values.id || generateUniqueID(), // Use existing ID or generate new
-      supervisorId: values.supervisorId || null, // Ensure supervisorId is null if empty string
+      id: existingEmployee?.id || values.id || generateUniqueID(),
+      supervisorId: values.supervisorId || null,
       proformaCost: Number(values.proformaCost),
-      employeeCategory: values.employeeCategory || undefined, // Store undefined if empty
+      employeeCategory: values.employeeCategory || undefined,
     };
     onSubmit(employeeData);
-    if (!existingEmployee) { // Reset form only if it's a new employee
+    if (!existingEmployee) {
       form.reset();
     }
   };
@@ -75,7 +83,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <ScrollArea className="h-[calc(100vh-200px)] pr-3"> {/* Adjust height as needed */}
+        <ScrollArea className="h-[calc(100vh-200px)] pr-3">
           <div className="space-y-4">
             <FormField
               control={form.control}
@@ -131,7 +139,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                       >
                         <option value="">None (Top Level)</option>
                         {allEmployees
-                          .filter(emp => emp.id !== existingEmployee?.id) // Prevent self-supervision
+                          .filter(emp => emp.id !== existingEmployee?.id)
                           .map(emp => (
                           <option key={emp.id} value={emp.id}>
                             {emp.employeeName} ({emp.id})
@@ -201,9 +209,21 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Employee Category</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Manager, Contributor" {...field} value={field.value || ''} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {EMPLOYEE_CATEGORIES.map(category => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
