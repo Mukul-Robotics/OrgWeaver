@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -29,7 +30,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } 
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { FileImport, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2 } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -239,7 +240,7 @@ export default function OrgWeaverPage() {
                     <SidebarGroup>
                       <SidebarGroupLabel className="flex items-center"><Users className="mr-2 h-4 w-4"/>Data Management</SidebarGroupLabel>
                       <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setImportModalOpen(true)}>
-                        <FileImport className="mr-2 h-4 w-4" /> Import Data
+                        <Import className="mr-2 h-4 w-4" /> Import Data
                       </Button>
                       <Button variant="outline" className="w-full justify-start" onClick={() => setExportModalOpen(true)}>
                         <FileOutput className="mr-2 h-4 w-4" /> Export Chart
