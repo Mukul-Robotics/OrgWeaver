@@ -45,7 +45,7 @@ export function HierarchyVisualizer({
           // Container for the direct reports (children)
           // This will be a flex container to arrange children in columns
           <div className={cn(
-            "mt-1 ml-4 pl-3 border-l-2 flex flex-wrap justify-start gap-x-4 gap-y-2", // gap-x for space between cards in a row, gap-y for space when they wrap
+            "mt-1 ml-4 pl-3 border-l-2 flex flex-wrap justify-center gap-x-4 gap-y-2", // Changed justify-start to justify-center
             levelColors[level % levelColors.length]
           )}>
             {node.children.map(child => (
@@ -54,12 +54,14 @@ export function HierarchyVisualizer({
                 "flex-shrink-0 flex-grow-0",
                 // Default: 2 items per row (mobile-first approach). gap-x-4 is 1rem.
                 "basis-[calc(50%-0.5rem)]", // Each takes 50% minus half the gap
-                // md: 3 items per row. 2 gaps total. Each takes 33.33% minus (2 * 0.5rem / 3)
-                "md:basis-[calc(33.333%-0.666rem)]",
-                // lg: 4 items per row. 3 gaps total. Each takes 25% minus (3 * 0.5rem / 4)
-                "lg:basis-[calc(25%-0.75rem)]",
-                 // xl: 5 items per row. 4 gaps total. Each takes 20% minus (4 * 0.5rem / 5)
-                "xl:basis-[calc(20%-0.8rem)]"
+                 // sm: 3 items per row.
+                "sm:basis-[calc(33.333%-0.666rem)]",
+                // md: 4 items per row.
+                "md:basis-[calc(25%-0.75rem)]",
+                 // lg: 5 items per row.
+                "lg:basis-[calc(20%-0.8rem)]",
+                 // xl: 6 items per row
+                "xl:basis-[calc(16.666%-0.833rem)]"
               )}>
                 {renderEmployeeSegment(child, level + 1)} {/* Recursive call for the child */}
               </div>
