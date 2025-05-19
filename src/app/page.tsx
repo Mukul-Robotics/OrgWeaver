@@ -238,14 +238,11 @@ export default function OrgWeaverPage() {
       toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
       return;
     }
-    // This standard browser function should open the print dialog.
-    // The actual printing to PDF/Paper is handled by the browser's print UI.
-    // Check browser console if dialog doesn't appear (might be due to sandboxing in dev envs)
     try {
       window.print();
     } catch (error) {
       console.error("Print error:", error);
-      toast({ title: 'Print Error', description: 'Could not open print dialog. Check browser console.', variant: 'destructive'});
+      toast({ title: 'Print Error', description: `Could not open print dialog: ${(error as Error).message}. Check browser console.`, variant: 'destructive'});
     }
   };
 
@@ -394,3 +391,5 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+
+    
