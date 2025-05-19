@@ -12,6 +12,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarTrigger,
+  SidebarInput, // Added SidebarInput
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -25,12 +26,12 @@ import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSu
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, ReorganizationSummaryData, AiRecommendationsData, PageSize } from '@/types/org-chart';
-import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/types/org-chart';
-import { buildHierarchyTree, calculateTotalProformaCost, flattenHierarchyTree } from '@/lib/orgChartUtils';
+import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
+import { buildHierarchyTree, calculateTotalProformaCost } from '@/lib/orgChartUtils';
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react'; // Added SearchIcon
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -87,33 +88,73 @@ export default function OrgWeaverPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
   const [viewStack, setViewStack] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState(''); // State for search term
 
   const { toast } = useToast();
 
+  // Filter employees based on search term
+  const filteredEmployees = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return employees;
+    }
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    return employees.filter(emp =>
+      emp.employeeName.toLowerCase().includes(lowerCaseSearchTerm) ||
+      (emp.positionTitle && emp.positionTitle.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.jobName && emp.jobName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.department && emp.department.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.id && emp.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.employeeCategory && emp.employeeCategory.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.grade && emp.grade.toLowerCase().includes(lowerCaseSearchTerm)) ||
+      (emp.location && emp.location.toLowerCase().includes(lowerCaseSearchTerm))
+    );
+  }, [employees, searchTerm]);
+
+  // Reset view stack if search term is active
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      setViewStack([]);
+      setSelectedNodeId(null);
+    }
+  }, [searchTerm]);
+
+
   const currentViewNodes = useMemo(() => {
+    const sourceEmployees = searchTerm.trim() ? filteredEmployees : employees;
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+
     if (!currentRootId) {
-      return buildHierarchyTree(employees, null, 0);
+      return buildHierarchyTree(sourceEmployees, null, 0);
     } else {
-      const rootEmployee = employees.find(e => e.id === currentRootId);
+      const rootEmployee = sourceEmployees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
-        setViewStack([]); // Reset stack if root employee not found
-        return buildHierarchyTree(employees, null, 0);
+        setViewStack([]); // Reset stack if root employee not found in current source
+        return buildHierarchyTree(sourceEmployees, null, 0);
       }
-      const children = buildHierarchyTree(employees, rootEmployee.id, (employees.find(e => e.id === currentRootId)?.level || 0) + 1);
-      const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
+      // Find the original level of the rootEmployee in the *unfiltered* hierarchy to maintain consistency
+      // This is a simplified approach; a more robust solution might store levels more centrally
+      let originalLevel = 0;
+      let tempSupervisorId = rootEmployee.supervisorId;
+      while(tempSupervisorId) {
+        originalLevel++;
+        const supervisor = employees.find(e => e.id === tempSupervisorId);
+        tempSupervisorId = supervisor ? supervisor.supervisorId : null;
+      }
+
+      const children = buildHierarchyTree(sourceEmployees, rootEmployee.id, originalLevel + 1);
+      const supervisor = rootEmployee.supervisorId ? sourceEmployees.find(sup => sup.id === rootEmployee.supervisorId) : null;
 
       const rootNode: EmployeeNode = {
         ...rootEmployee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
         children: children,
-        level: employees.find(e => e.id === currentRootId)?.level || 0,
+        level: originalLevel,
         directReportCount: children.length,
         totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
       };
       return [rootNode];
     }
-  }, [employees, viewStack]);
+  }, [employees, filteredEmployees, searchTerm, viewStack]);
 
 
   const currentEditingEmployee = useMemo(() => {
@@ -125,6 +166,7 @@ export default function OrgWeaverPage() {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(data);
     setViewStack([]);
+    setSearchTerm(''); // Clear search on new import
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
     if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
        triggerReorganizationSummary(originalEmployeesForSummary, data);
@@ -168,20 +210,22 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prev => prev.filter(id => id !== employeeId));
+    setViewStack(prev => prev.filter(id => id !== employeeId)); // Remove deleted ID from stack
+    setSelectedNodeId(null); // Clear selection
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
-    setSelectedNodeId(null);
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
+    // Allow drill down only if no active search or if the selected node is part of filtered results
+    const targetEmployees = searchTerm.trim() ? filteredEmployees : employees;
+    const nodeToDrill = targetEmployees.find(e => e.id === nodeId);
 
-    const nodeToDrill = employees.find(e => e.id === nodeId);
     if (nodeToDrill) {
-        const hasChildren = employees.some(e => e.supervisorId === nodeId);
+        const hasChildrenInCurrentView = targetEmployees.some(e => e.supervisorId === nodeId);
         const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
-        if (hasChildren && !isCurrentRoot) {
+        if (hasChildrenInCurrentView && !isCurrentRoot) {
             setViewStack(prevStack => [...prevStack, nodeId]);
         }
     }
@@ -287,7 +331,12 @@ export default function OrgWeaverPage() {
     } catch (error) {
       console.error("Print error:", error);
       const errorMessage = (error instanceof Error) ? error.message : String(error);
-      toast({ title: 'Print Error', description: `Could not open print dialog: ${errorMessage}. Check browser console or sandbox settings.`, variant: 'destructive'});
+      // Check if running in a sandboxed iframe, which often restricts window.print()
+      if (window.self !== window.top && errorMessage.toLowerCase().includes('sandboxed')) {
+         toast({ title: 'Print Error', description: `Printing is restricted in this sandboxed view. Try opening the app in a new tab or after deployment.`, variant: 'destructive'});
+      } else {
+         toast({ title: 'Print Error', description: `Could not open print dialog: ${errorMessage}.`, variant: 'destructive'});
+      }
     }
   };
 
@@ -299,7 +348,7 @@ export default function OrgWeaverPage() {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full flex-col bg-muted/40">
-        <AppHeader onGoUp={handleGoUp} canGoUp={viewStack.length > 0} />
+        <AppHeader onGoUp={handleGoUp} canGoUp={viewStack.length > 0 && !searchTerm.trim()} />
         <div className="flex flex-1">
           <Sidebar collapsible="icon" className="hidden border-r bg-background md:flex" side="left">
             <SidebarHeader className="p-2">
@@ -309,6 +358,15 @@ export default function OrgWeaverPage() {
               <SidebarContent className="py-2">
                 {sidebarView === 'controls' && (
                   <>
+                    <SidebarGroup>
+                      <SidebarGroupLabel className="flex items-center"><SearchIcon className="mr-2 h-4 w-4"/>Search</SidebarGroupLabel>
+                      <SidebarInput 
+                        placeholder="Search employees..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </SidebarGroup>
+                    <Separator className="my-4" />
                     <SidebarGroup>
                       <SidebarGroupLabel className="flex items-center"><Users className="mr-2 h-4 w-4"/>Data Management</SidebarGroupLabel>
                       <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setImportModalOpen(true)}>
@@ -435,3 +493,5 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+
+    
