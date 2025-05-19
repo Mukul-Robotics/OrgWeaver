@@ -143,12 +143,14 @@ export default function OrgWeaverPage() {
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
   const [viewStack, setViewStack] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCurrentlySearching, setIsCurrentlySearching] = useState(false);
+
 
   const { toast } = useToast();
 
   const filteredEmployeeIds = useMemo(() => {
     if (!searchTerm.trim()) {
-      return null;
+      return null; // No active search, no IDs are "filtered" in this sense
     }
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     return new Set(
@@ -167,35 +169,28 @@ export default function OrgWeaverPage() {
     );
   }, [employees, searchTerm]);
 
-  // Effect to reset view when search term becomes active or is cleared
   useEffect(() => {
-    // Only reset if search term existence changes (empty to non-empty, or non-empty to empty)
-    const isSearching = searchTerm.trim() !== '';
-    const wasSearching = viewStack.some(id => !employees.find(e => e.id === id)); // Heuristic: if viewStack has non-existent items, likely was search
-
-    if (isSearching || (wasSearching && !isSearching) ) {
-        setViewStack([]);
-        setSelectedNodeId(null);
+    const newIsSearchingState = searchTerm.trim() !== '';
+    if (newIsSearchingState !== isCurrentlySearching) {
+      setViewStack([]);
+      setSelectedNodeId(null); // Reset selection when search status changes
+      setIsCurrentlySearching(newIsSearchingState);
     }
-  }, [searchTerm, employees]);
+  }, [searchTerm, isCurrentlySearching]);
 
 
   const currentViewNodes = useMemo(() => {
     const fullEmployeeMap = new Map(employees.map(e => [e.id, e]));
 
-    if (searchTerm.trim()) {
-      // Active search
+    if (isCurrentlySearching) { // Use the state variable
       if (!filteredEmployeeIds || filteredEmployeeIds.size === 0) return [];
 
-      // Build the full tree of search results (includes ancestors of matches)
       const searchResultTree = buildFilteredTreeForSearch(employees, filteredEmployeeIds, null, 0, fullEmployeeMap);
-      
       const currentSearchRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
       if (!currentSearchRootId) {
-        return searchResultTree; // Show top-level of search results
+        return searchResultTree;
       } else {
-        // Attempt to find the drilled-down node within the searchResultTree
         let rootNodeFromSearch: EmployeeNode | null = null;
         const findNodeInTreeRecursive = (nodes: EmployeeNode[], id: string): EmployeeNode | null => {
           for (const node of nodes) {
@@ -210,10 +205,10 @@ export default function OrgWeaverPage() {
         rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
         
         if (rootNodeFromSearch) {
-          return [rootNodeFromSearch]; // Show the drilled-down node from search results
+          return [rootNodeFromSearch];
         }
-        // If currentSearchRootId (from old viewStack) isn't in the new searchResultTree,
-        // useEffect should have cleared viewStack, so we show searchResultTree roots.
+        // Fallback if currentSearchRootId not in searchResultTree (e.g. after refining search)
+        // The useEffect should handle resetting viewStack, leading to searchResultTree display.
         return searchResultTree; 
       }
     } else {
@@ -221,18 +216,14 @@ export default function OrgWeaverPage() {
       const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
       if (!currentRootId) {
-        // Top-level view
         return buildHierarchyTree(employees, null, 0);
       } else {
-        // Drilled-down view
         const rootEmployee = employees.find(e => e.id === currentRootId);
         if (!rootEmployee) {
-          // Invalid rootId in viewStack (e.g., employee deleted), reset to top-level
-          setViewStack([]); // Clear stack to prevent invalid state
+          setViewStack([]); 
           return buildHierarchyTree(employees, null, 0);
         }
         
-        // Calculate original level of the rootEmployee
         let originalLevel = 0;
         let tempSupervisorId = rootEmployee.supervisorId;
         while(tempSupervisorId) {
@@ -255,7 +246,7 @@ export default function OrgWeaverPage() {
         return [rootNodeToDisplay];
       }
     }
-  }, [employees, searchTerm, viewStack, filteredEmployeeIds]);
+  }, [employees, searchTerm, viewStack, filteredEmployeeIds, isCurrentlySearching]);
 
 
   const currentEditingEmployee = useMemo(() => {
@@ -267,8 +258,8 @@ export default function OrgWeaverPage() {
     const currentEmployeesForSummary = employees.length > 0 ? [...employees] : initialSampleEmployees;
     setOriginalEmployeesForSummary(currentEmployeesForSummary);
     setEmployees(data);
-    setViewStack([]);
-    setSearchTerm(''); 
+    setViewStack([]); // Reset view on new data
+    setSearchTerm(''); // Clear search term
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
     triggerReorganizationSummary(currentEmployeesForSummary, data);
   };
@@ -319,16 +310,14 @@ export default function OrgWeaverPage() {
     setEmployees(updatedEmployees);
     setViewStack(prevStack => {
         const newStack = prevStack.filter(id => id !== employeeId);
-        // If the deleted node was the current root of the drill-down,
-        // select its parent if possible, otherwise clear selection.
         if (selectedNodeId === employeeId && newStack.length > 0) {
             setSelectedNodeId(newStack[newStack.length -1]);
-        } else if (selectedNodeId === employeeId) {
-            setSelectedNodeId(null);
+        } else if (selectedNodeId === employeeId || (selectedNodeId && !updatedEmployees.find(e=>e.id === selectedNodeId))) {
+            // if deleted node was selected OR selected node no longer exists in updated list
+            setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length -1] : null);
         }
         return newStack;
     });
-    // setSelectedNodeId(null); // Clear selection if the deleted node was selected
     
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been handled.` });
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
@@ -336,37 +325,42 @@ export default function OrgWeaverPage() {
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
-    const targetEmployee = employees.find(e => e.id === nodeId);
 
-    if (targetEmployee) {
-      const hasChildren = searchTerm.trim() 
-        ? currentViewNodes.find(n => n.id === nodeId)?.children?.length > 0
-        : employees.some(e => e.supervisorId === nodeId);
+    let nodeInCurrentViewContext: EmployeeNode | undefined;
 
-      const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
-
-      if (hasChildren && !isCurrentRoot) {
-        setViewStack(prevStack => [...prevStack, nodeId]);
+    if (viewStack.length === 0) { 
+      nodeInCurrentViewContext = currentViewNodes.find(n => n.id === nodeId);
+    } else { 
+      const parentNodeFromView = currentViewNodes[0]; 
+      if (parentNodeFromView?.id === nodeId) {
+        nodeInCurrentViewContext = parentNodeFromView;
+      } else { 
+        nodeInCurrentViewContext = parentNodeFromView?.children?.find(child => child.id === nodeId);
       }
+    }
+  
+    const hasChildrenInCurrentContext = !!(nodeInCurrentViewContext?.children && nodeInCurrentViewContext.children.length > 0);
+    const isCurrentRootNode = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
+  
+    if (hasChildrenInCurrentContext && !isCurrentRootNode) {
+      setViewStack(prevStack => [...prevStack, nodeId]);
     }
   };
 
   const handleEditEmployeeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId);
+    setSelectedNodeId(nodeId); // Ensure the node is selected for editing
     setEditModalOpen(true);
   };
 
 
   const handleGoUp = () => {
-    // If searching and drilled down, go up within search results
-    // If searching and at top of search results, clearing search acts as "go up"
-    if (searchTerm.trim() && viewStack.length === 0) {
-        setSearchTerm(''); // This will trigger useEffect to clear viewStack
-        // setSelectedNodeId(null); // Done by useEffect
+    // If searching and at top of search results (viewStack empty), clearing search acts as "go up"
+    if (isCurrentlySearching && viewStack.length === 0) {
+        setSearchTerm(''); // This will trigger useEffect to clear viewStack and reset isCurrentlySearching
         return;
     }
     
-    // Standard go up logic (works for both normal and search-drilldown)
+    // Standard go up logic for both normal and search-drilldown
     const newStack = viewStack.slice(0, -1);
     setViewStack(newStack);
     setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
@@ -443,7 +437,7 @@ export default function OrgWeaverPage() {
     window.print();
   };
 
-  const canGoUp = viewStack.length > 0 || (searchTerm.trim() !== '' && viewStack.length === 0);
+  const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
 
 
   return (
@@ -663,5 +657,6 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+    
 
     
