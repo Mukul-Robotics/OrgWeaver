@@ -229,6 +229,8 @@ export default function OrgWeaverPage() {
       toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
       return;
     }
+    // This standard browser function should open the print dialog.
+    // The actual printing to PDF/Paper is handled by the browser's print UI.
     window.print();
   };
 
@@ -356,3 +358,4 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+

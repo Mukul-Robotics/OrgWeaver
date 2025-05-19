@@ -1,129 +1,92 @@
-
+/* public/print.css */
 @media print {
-  @page {
-    size: A4;
-    margin: 15mm; /* Standard A4 margin */
-  }
-
   body {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    background-color: #fff !important;
-    color: #000 !important;
-    width: 100%;
-    height: auto;
+    font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
+    color: #000 !important;
+    background-color: #fff !important;
+    -webkit-print-color-adjust: exact; /* Ensures background colors and images are printed in Chrome/Safari */
+    print-color-adjust: exact; /* Standard property for color adjust */
   }
 
   /* Hide non-essential elements */
   header.sticky, /* AppHeader */
-  div[data-sidebar="sidebar"], /* Sidebar main div */
-  div[data-sidebar="sidebar"] ~ div, /* Sibling divs of the sidebar if any at root */
-  button[aria-label="Delete Selected Employee"], /* Specific delete button */
-  .ToastViewport, /* Toasts */
-  div[role="dialog"], /* All modals */
-  aside[data-radix-focus-guard], /* Focus guards from Radix */
-  .group\/sidebar-wrapper > div:not(.flex-1.flex.flex-col), /* Hide sidebar container but not main content wrapper */
-  .md\:hidden[data-sidebar="trigger"], /* Mobile sidebar trigger */
-  button:not([aria-label="Delete Selected Employee"]) /* Hide all buttons except explicitly kept ones, if any. The print button itself is good to hide. */
-   {
+  div[data-sidebar='sidebar'], /* The main sidebar */
+  button[data-sidebar='trigger'], /* Mobile sidebar trigger */
+  button[aria-label*="Delete Selected Employee"], /* Specific delete button */
+  div[role="dialog"], /* All dialog modals */
+  div[data-radix-toast-viewport], /* Toast notifications */
+  iframe, /* If any iframes are present */
+  .hide-on-print /* Utility class for manual hiding */
+  {
     display: none !important;
     visibility: hidden !important;
   }
-  
-  /* Ensure the main content area (SidebarInset) and chart visualizer expand */
-  .flex-1.flex.flex-col, /* Parent of <main> */
-  main.flex-1.p-0.overflow-hidden {
-    padding: 0 !important;
-    margin: 0 !important;
+
+  /* Ensure the main chart content area (SidebarInset which is a <main> tag) is visible */
+  main.flex-1 {
+    display: block !important;
     width: 100% !important;
-    max-width: 100% !important;
     height: auto !important;
     overflow: visible !important;
-    flex: 1 1 auto !important; /* Allow shrinking if content is small, but grow */
-    display: block !important; /* Change from flex to block for simpler print layout */
-  }
-  
-  /* HierarchyVisualizer root and its direct children (ul) */
-  .p-1.md\:p-2.overflow-auto.h-full.bg-background,
-  .flex.flex-wrap.justify-center.gap-2 {
-    padding: 0 !important;
+    position: static !important;
     margin: 0 !important;
-    overflow: visible !important;
-    height: auto !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    background-color: #fff !important; /* Ensure white background for print */
-    display: block; /* Simpler layout for printing */
-  }
-  
-  /* Styling for individual OrgChartNodeCards for print */
-  .shadow-sm,
-  .hover\:shadow-lg,
-  .transition-shadow,
-  .cursor-pointer,
-  .ring-2.ring-primary {
+    padding: 1cm !important; /* Add some padding for print */
     box-shadow: none !important;
-    border: 1px solid #ccc !important; /* A clear border for each card */
-    page-break-inside: avoid !important; /* Attempt to keep cards on one page */
+    border: none !important;
+    background-color: #fff !important; /* Ensure white background for the print area */
+  }
+
+  /* Specifically target the HierarchyVisualizer's direct parent if needed, but main should cover it */
+  /* div.p-1.md\:p-2.overflow-auto.h-full.bg-background (HierarchyVisualizer's wrapper) */
+  main.flex-1 > div {
+     background-color: #fff !important;
+     padding: 0 !important;
+     margin: 0 !important;
+     overflow: visible !important;
+     height: auto !important;
+  }
+
+
+  /* Org Chart Node Card Styles for Print */
+  .org-chart-node-card, /* If you have a specific class on cards */
+  article[class*="Card-module"], /* Fallback for generic card class */
+  div[class*="card"] /* General card targeting */
+  {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 8px; /* Space between stacked cards */
     background-color: #fff !important;
-    margin-bottom: 8px; /* Add some space between cards if they stack due to page breaks */
   }
 
-  /* Ensure card content text is legible */
-  .text-primary, 
-  .text-muted-foreground, 
-  .text-foreground, 
-  .text-foreground\/80,
-  .text-card-foreground,
-  .text-popover-foreground {
+  /* Ensure text within cards is legible */
+  .org-chart-node-card *,
+  article[class*="Card-module"] *,
+  div[class*="card"] * {
     color: #000 !important;
-  }
-
-  .bg-primary, .bg-secondary, .bg-accent, .bg-card, .bg-popover {
-    background-color: transparent !important;
-    color: #000 !important;
-  }
-
-  .badge {
-    border: 1px solid #ddd !important;
-    color: #000 !important;
-    background-color: #fff !important;
-  }
-
-  /* Hierarchy lines */
-  .border-l-2 {
-    border-left-width: 1px !important;
-    /* Use a consistent color for all lines or remove if not desired for print */
-    border-color: #aaa !important; 
-    padding-left: 8px !important; /* Ensure padding is reasonable */
   }
   
-  /* Remove fixed positioning for delete button if it wasn't caught by general button hiding */
-  .fixed.bottom-4.right-4 {
-      display: none !important;
+  /* Hierarchy lines */
+  ul[class*="border-l-2"] {
+    border-left-width: 1px !important;
+    border-color: #888 !important; /* A light, printable gray */
+    padding-left: 0.5rem !important; /* Maintain some indentation */
   }
 
-  /* Ensure icons are visible if they use foreground color */
-  .lucide-react {
+  /* General link styling for print */
+  a {
+    text-decoration: none;
     color: #000 !important;
   }
-
-  /* Reset flex properties on node list items for simpler block layout in print */
-  ul > li[class*="basis-"] {
-    flex-basis: auto !important;
-    width: 100% !important; /* Each node takes full width, will stack vertically */
-    display: block !important; /* Ensure it's a block element */
-    margin-bottom: 10px; /* Space between stacked nodes */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")"; /* Optionally show URLs for external links */
+    font-size: 90%;
   }
-   /* Reset justify-center for the main list of nodes to allow block layout */
-  .flex.flex-wrap.justify-center.gap-2 {
-    justify-content: flex-start !important; /* Align to start for block layout */
-  }
-}
 
-/* Additional styles to ensure the page content itself can be targeted */
-#printable-area { /* You might need to wrap your chart in a div with this id */
-  width: 100%;
+  @page {
+    size: A4;
+    margin: 1cm; /* Default margin for A4 pages */
+  }
 }
