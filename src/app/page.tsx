@@ -128,19 +128,17 @@ export default function OrgWeaverPage() {
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
     if (!currentRootId) {
-      // When at the top level, buildHierarchyTree with null supervisorId returns all top-level nodes
-      // with their respective hierarchies already built.
       return buildHierarchyTree(sourceEmployees, null, 0);
     } else {
       const rootEmployee = sourceEmployees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
-        setViewStack([]); // Reset stack if root employee not found in current source
-        return buildHierarchyTree(sourceEmployees, null, 0); // Show top-level if reset
+        setViewStack([]); 
+        return buildHierarchyTree(employees, null, 0); // Use full 'employees' list here for robust reset
       }
-      // Find the original level of the rootEmployee in the *unfiltered* hierarchy to maintain consistency
+      
       let originalLevel = 0;
       let tempSupervisorId = rootEmployee.supervisorId;
-      const allEmployeesMap = new Map(employees.map(e => [e.id, e])); // Use all employees for level calculation
+      const allEmployeesMap = new Map(employees.map(e => [e.id, e])); 
 
       while(tempSupervisorId) {
         originalLevel++;
@@ -173,7 +171,7 @@ export default function OrgWeaverPage() {
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(data);
     setViewStack([]);
-    setSearchTerm(''); // Clear search on new import
+    setSearchTerm(''); 
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
     if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
        triggerReorganizationSummary(originalEmployeesForSummary, data);
@@ -217,15 +215,14 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prev => prev.filter(id => id !== employeeId)); // Remove deleted ID from stack
-    setSelectedNodeId(null); // Clear selection
+    setViewStack(prev => prev.filter(id => id !== employeeId)); 
+    setSelectedNodeId(null); 
     toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
-    // Allow drill down only if no active search or if the selected node is part of filtered results
     const targetEmployees = searchTerm.trim() ? filteredEmployees : employees;
     const nodeToDrill = targetEmployees.find(e => e.id === nodeId);
 
@@ -338,7 +335,6 @@ export default function OrgWeaverPage() {
     } catch (error) {
       console.error("Print error:", error);
       const errorMessage = (error instanceof Error) ? error.message : String(error);
-      // Check if running in a sandboxed iframe, which often restricts window.print()
       if (window.self !== window.top && errorMessage.toLowerCase().includes('sandboxed')) {
          toast({ title: 'Print Error', description: `Printing is restricted in this sandboxed view. Try opening the app in a new tab or after deployment.`, variant: 'destructive'});
       } else {
@@ -446,7 +442,7 @@ export default function OrgWeaverPage() {
           </Sidebar>
 
           <SidebarInset className="flex-1 flex flex-col">
-            <main className="flex-1 p-0 overflow-hidden"> {/* Changed p-4 to p-0 and added overflow-hidden */}
+            <main className="flex-1 p-0 overflow-hidden"> 
               <HierarchyVisualizer
                 nodes={currentViewNodes}
                 selectedAttributes={selectedAttributes}
@@ -468,7 +464,7 @@ export default function OrgWeaverPage() {
       {currentEditingEmployee && (
         <EditEmployeeModal
             isOpen={isEditModalOpen}
-            onClose={() => { setEditModalOpen(false); /* setSelectedNodeId(null); Don't nullify here, might be needed for delete context */ }}
+            onClose={() => { setEditModalOpen(false); }}
             employee={currentEditingEmployee}
             allEmployees={employees}
             onUpdateEmployee={handleUpdateEmployee}
