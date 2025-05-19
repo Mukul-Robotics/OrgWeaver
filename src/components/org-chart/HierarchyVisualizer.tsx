@@ -45,23 +45,24 @@ export function HierarchyVisualizer({
           // Container for the direct reports (children)
           // This will be a flex container to arrange children in columns
           <div className={cn(
-            "mt-1 ml-4 pl-3 border-l-2 flex flex-wrap justify-center gap-x-4 gap-y-2", // Changed justify-start to justify-center
-            levelColors[level % levelColors.length]
+            "mt-1 ml-4 pl-3 border-l-2 flex flex-wrap justify-center -mx-2", // Negative margin for x-axis gap control
+            levelColors[level % levelColors.length],
+            "gap-y-2" // Vertical gap for wrapped items
           )}>
             {node.children.map(child => (
-              // Each child is a column item with responsive width
+              // Each child is a column item with responsive width and padding for gaps
               <div key={child.id} className={cn(
-                "flex-shrink-0 flex-grow-0",
-                // Default: 2 items per row (mobile-first approach). gap-x-4 is 1rem.
-                "basis-[calc(50%-0.5rem)]", // Each takes 50% minus half the gap
+                "flex-shrink-0 flex-grow-0 px-2", // Horizontal padding to create gaps
+                // Default: 2 items per row (mobile-first approach)
+                "basis-1/2",
                  // sm: 3 items per row.
-                "sm:basis-[calc(33.333%-0.666rem)]",
+                "sm:basis-1/3",
                 // md: 4 items per row.
-                "md:basis-[calc(25%-0.75rem)]",
+                "md:basis-1/4",
                  // lg: 5 items per row.
-                "lg:basis-[calc(20%-0.8rem)]",
+                "lg:basis-1/5",
                  // xl: 6 items per row
-                "xl:basis-[calc(16.666%-0.833rem)]"
+                "xl:basis-1/6"
               )}>
                 {renderEmployeeSegment(child, level + 1)} {/* Recursive call for the child */}
               </div>
