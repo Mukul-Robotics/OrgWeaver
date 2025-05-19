@@ -13,6 +13,10 @@ import {
   SidebarGroupLabel,
   SidebarTrigger,
   SidebarInput,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarSeparator,
+  SidebarGroupContent,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -24,10 +28,11 @@ import { ExportDataModal } from '@/components/modals/ExportDataModal';
 import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsModal';
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
+import { LogoIcon } from '@/components/icons/LogoIcon'; // Added import
 
-import type { Employee, EmployeeNode, DisplayAttributeKey, ReorganizationSummaryData, AiRecommendationsData, PageSize } from '@/types/org-chart';
+import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
 import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
-import { buildHierarchyTree, calculateTotalProformaCost } from '@/lib/orgChartUtils';
+import { buildHierarchyTree, calculateTotalProformaCost, generateUniqueID } from '@/lib/orgChartUtils';
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
@@ -73,6 +78,54 @@ const initialSampleEmployees: Employee[] = [
   { id: '14', employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern' },
 ];
 
+// Helper function to recursively build a filtered tree for search results
+// It takes the full list of employees and the set of IDs that match the search
+const buildFilteredTreeForSearch = (
+  allEmployees: Employee[],
+  matchingEmployeeIds: Set<string>,
+  currentSupervisorId: string | null,
+  currentLevel: number,
+  fullEmployeeMap: Map<string, Employee>
+): EmployeeNode[] => {
+  const nodes: EmployeeNode[] = [];
+  const childrenOfSupervisor = allEmployees.filter(e => e.supervisorId === currentSupervisorId);
+
+  childrenOfSupervisor.forEach(employee => {
+    // Recursively find children who match or lead to a match
+    const childrenNodes = buildFilteredTreeForSearch(
+      allEmployees,
+      matchingEmployeeIds,
+      employee.id, // Current employee's ID becomes supervisorId for next level
+      currentLevel + 1,
+      fullEmployeeMap
+    );
+
+    // Include this employee in the results if:
+    // 1. They directly match the search criteria.
+    // 2. Or, they have children (recursively) who match the search criteria.
+    if (matchingEmployeeIds.has(employee.id) || childrenNodes.length > 0) {
+      const supervisor = employee.supervisorId ? fullEmployeeMap.get(employee.supervisorId) : null;
+      
+      let totalReportCount = childrenNodes.length;
+      childrenNodes.forEach(child => {
+        totalReportCount += child.totalReportCount || 0; // Summing up total reports from children
+      });
+
+      nodes.push({
+        ...employee,
+        supervisorName: supervisor?.employeeName,
+        children: childrenNodes,
+        level: currentLevel,
+        directReportCount: childrenNodes.length, // Direct reports *that are part of the filtered result tree*
+        totalReportCount: totalReportCount, // Total reports *within this filtered branch*
+        // isSearchResultDirectMatch: matchingEmployeeIds.has(employee.id) // Optional flag for styling matches
+      });
+    }
+  });
+  nodes.sort((a, b) => a.employeeName.localeCompare(b.employeeName)); // Sort siblings
+  return nodes;
+};
+
 
 export default function OrgWeaverPage() {
   const [employees, setEmployees] = useState<Employee[]>(initialSampleEmployees);
@@ -92,64 +145,79 @@ export default function OrgWeaverPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<'controls' | 'addEmployee' | 'editEmployee'>('controls');
   const [viewStack, setViewStack] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState(''); // State for search term
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { toast } = useToast();
 
-  // Filter employees based on search term
-  const filteredEmployees = useMemo(() => {
+  // sourceEmployees will now be the full list, and filtering for display happens in currentViewNodes
+  const sourceEmployees = useMemo(() => {
+    return employees; 
+  }, [employees]);
+
+  const filteredEmployeeIds = useMemo(() => {
     if (!searchTerm.trim()) {
-      return employees;
+      return null; // No search term, so no filtering needed by ID
     }
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return employees.filter(emp =>
-      emp.employeeName.toLowerCase().includes(lowerCaseSearchTerm) ||
-      (emp.positionTitle && emp.positionTitle.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.jobName && emp.jobName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.department && emp.department.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.id && emp.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.employeeCategory && emp.employeeCategory.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.grade && emp.grade.toLowerCase().includes(lowerCaseSearchTerm)) ||
-      (emp.location && emp.location.toLowerCase().includes(lowerCaseSearchTerm))
+    return new Set(
+      employees
+        .filter(emp =>
+          emp.employeeName.toLowerCase().includes(lowerCaseSearchTerm) ||
+          (emp.positionTitle && emp.positionTitle.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.jobName && emp.jobName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.department && emp.department.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.id && emp.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.employeeCategory && emp.employeeCategory.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.grade && emp.grade.toLowerCase().includes(lowerCaseSearchTerm)) ||
+          (emp.location && emp.location.toLowerCase().includes(lowerCaseSearchTerm))
+        )
+        .map(emp => emp.id)
     );
   }, [employees, searchTerm]);
 
-  // Reset view stack if search term is active
   useEffect(() => {
     if (searchTerm.trim()) {
-      setViewStack([]);
+      setViewStack([]); // Reset drill-down when search is active
       setSelectedNodeId(null);
     }
   }, [searchTerm]);
 
 
   const currentViewNodes = useMemo(() => {
-    const sourceEmployees = searchTerm.trim() ? filteredEmployees : employees;
+    const fullEmployeeMap = new Map(employees.map(e => [e.id, e]));
+
+    if (searchTerm.trim()) {
+      if (!filteredEmployeeIds || filteredEmployeeIds.size === 0) return [];
+      return buildFilteredTreeForSearch(employees, filteredEmployeeIds, null, 0, fullEmployeeMap);
+    }
+
+    // Not searching, handle normal drill-down view
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
     if (!currentRootId) {
-      return buildHierarchyTree(sourceEmployees, null, 0);
+      // Not drilled down, show top-level from all employees
+      return buildHierarchyTree(employees, null, 0);
     } else {
-      const rootEmployee = sourceEmployees.find(e => e.id === currentRootId);
+      // Drilled down view
+      const rootEmployee = employees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
-        setViewStack([]); 
-        return buildHierarchyTree(employees, null, 0); // Use full 'employees' list here for robust reset
+        // Invalid rootId in viewStack, reset to top-level from full list
+        return buildHierarchyTree(employees, null, 0);
       }
       
       let originalLevel = 0;
       let tempSupervisorId = rootEmployee.supervisorId;
       const allEmployeesMap = new Map(employees.map(e => [e.id, e])); 
-
       while(tempSupervisorId) {
         originalLevel++;
         const supervisor = allEmployeesMap.get(tempSupervisorId);
         tempSupervisorId = supervisor ? supervisor.supervisorId : null;
       }
 
-      const children = buildHierarchyTree(sourceEmployees, rootEmployee.id, originalLevel + 1);
-      const supervisor = rootEmployee.supervisorId ? sourceEmployees.find(sup => sup.id === rootEmployee.supervisorId) : null;
+      const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1);
+      const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
 
-      const rootNode: EmployeeNode = {
+      const rootNodeToDisplay: EmployeeNode = {
         ...rootEmployee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
         children: children,
@@ -157,9 +225,9 @@ export default function OrgWeaverPage() {
         directReportCount: children.length,
         totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
       };
-      return [rootNode];
+      return [rootNodeToDisplay];
     }
-  }, [employees, filteredEmployees, searchTerm, viewStack]);
+  }, [employees, searchTerm, viewStack, filteredEmployeeIds]);
 
 
   const currentEditingEmployee = useMemo(() => {
@@ -168,30 +236,38 @@ export default function OrgWeaverPage() {
 
 
   const handleImportData = (data: Employee[], fileName: string) => {
-    setOriginalEmployeesForSummary([...employees]);
+    const currentEmployeesForSummary = employees.length > 0 ? [...employees] : initialSampleEmployees;
+    setOriginalEmployeesForSummary(currentEmployeesForSummary);
     setEmployees(data);
     setViewStack([]);
     setSearchTerm(''); 
     toast({ title: 'Data Imported', description: `Imported ${data.length} employees from ${fileName}.` });
-    if (originalEmployeesForSummary && originalEmployeesForSummary.length > 0) {
-       triggerReorganizationSummary(originalEmployeesForSummary, data);
-    }
+    triggerReorganizationSummary(currentEmployeesForSummary, data);
   };
 
-  const handleAddEmployee = (newEmployee: Employee) => {
+  const handleAddEmployee = (newEmployeeData: Omit<Employee, 'id'> | Employee) => {
+    const newEmployee: Employee = {
+        id: ('id' in newEmployeeData && newEmployeeData.id) ? newEmployeeData.id : generateUniqueID(),
+        ...newEmployeeData,
+    };
+
     setOriginalEmployeesForSummary([...employees]);
     setEmployees(prev => {
       const existingIndex = prev.findIndex(e => e.id === newEmployee.id);
       if (existingIndex > -1) {
+        // This is an update of an existing employee if ID matches
         const updated = [...prev];
         updated[existingIndex] = newEmployee;
+        toast({ title: 'Employee Updated', description: `${newEmployee.employeeName} has been updated.` });
+        triggerReorganizationSummary(originalEmployeesForSummary || [], updated);
         return updated;
       }
+      // This is adding a new employee
+      toast({ title: 'Employee Added', description: `${newEmployee.employeeName} has been added.` });
+      triggerReorganizationSummary(originalEmployeesForSummary || [], [...prev, newEmployee]);
       return [...prev, newEmployee];
     });
-    toast({ title: 'Employee Added/Updated', description: `${newEmployee.employeeName} has been processed.` });
     setSidebarView('controls');
-    triggerReorganizationSummary(originalEmployeesForSummary || [], [...employees, newEmployee]);
   };
 
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
@@ -215,23 +291,32 @@ export default function OrgWeaverPage() {
       .map(e => e.supervisorId === employeeId ? { ...e, supervisorId: newSupervisorId } : e);
 
     setEmployees(updatedEmployees);
-    setViewStack(prev => prev.filter(id => id !== employeeId)); 
-    setSelectedNodeId(null); 
-    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} has been handled.` });
+    setViewStack(prevStack => { // Adjust viewStack if the deleted node was part of it
+        const newStack = prevStack.filter(id => id !== employeeId);
+        if (selectedNodeId === employeeId && newStack.length > 0) {
+            setSelectedNodeId(newStack[newStack.length -1]);
+        } else if (selectedNodeId === employeeId) {
+            setSelectedNodeId(null);
+        }
+        return newStack;
+    });
+    if (selectedNodeId === employeeId) setSelectedNodeId(null); // Ensure selection is cleared if deleted node was selected
+    
+    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been handled.` });
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
-    const targetEmployees = searchTerm.trim() ? filteredEmployees : employees;
-    const nodeToDrill = targetEmployees.find(e => e.id === nodeId);
+    const targetEmployee = employees.find(e => e.id === nodeId);
 
-    if (nodeToDrill) {
-        const hasChildrenInCurrentView = targetEmployees.some(e => e.supervisorId === nodeId);
-        const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
-        if (hasChildrenInCurrentView && !isCurrentRoot) {
-            setViewStack(prevStack => [...prevStack, nodeId]);
-        }
+    if (targetEmployee) {
+      const hasChildren = employees.some(e => e.supervisorId === nodeId);
+      const isCurrentRoot = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
+
+      if (hasChildren && !isCurrentRoot && !searchTerm.trim()) {
+        setViewStack(prevStack => [...prevStack, nodeId]);
+      }
     }
   };
 
@@ -242,19 +327,25 @@ export default function OrgWeaverPage() {
 
 
   const handleGoUp = () => {
-    const newStack = viewStack.slice(0, -1);
-    setViewStack(newStack);
-    setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
+    if (searchTerm.trim()) {
+        setSearchTerm('');
+        setViewStack([]);
+        setSelectedNodeId(null);
+    } else {
+        const newStack = viewStack.slice(0, -1);
+        setViewStack(newStack);
+        setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
+    }
   };
 
 
-  const triggerReorganizationSummary = async (original: Employee[], revised: Employee[]) => {
+  const triggerReorganizationSummary = async (original: Employee[] | null, revised: Employee[]) => {
     if (!original || original.length === 0) {
       const currentCost = calculateTotalProformaCost(revised);
-      const jobsCovered = Array.from(new Set(revised.map(e => e.jobName || 'N/A')));
+      const jobsCovered = Array.from(new Set(revised.map(e => e.jobName || 'N/A').filter(Boolean)));
       setReorgSummary({
-        summary: "Initial organization structure loaded.",
-        costChange: currentCost,
+        summary: "Initial organization structure loaded or no previous version for comparison.",
+        costChange: currentCost, // Show current cost as 'change' from 0
         jobsAdded: jobsCovered,
         jobsRemoved: [],
         jobsCovered: jobsCovered,
@@ -291,7 +382,7 @@ export default function OrgWeaverPage() {
     setAiModalOpen(true);
     try {
       const currentHierarchyJson = JSON.stringify(employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp));
-      const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs.";
+      const organizationalGoals = "Improve efficiency, clarify reporting lines, and optimize costs."; // Example goals
       const recommendations = await recommendHierarchyOptimizations({
         organizationHierarchy: currentHierarchyJson,
         organizationalGoals,
@@ -299,199 +390,242 @@ export default function OrgWeaverPage() {
       setAiRecommendations(recommendations);
     } catch (error) {
       console.error("Error fetching AI recommendations:", error);
-      toast({ title: 'AI Recommendation Error', description: 'Could not generate recommendations.', variant: 'destructive' });
+      toast({ title: 'AI Recommendation Error', description: 'Could not generate AI recommendations.', variant: 'destructive' });
       setAiRecommendations(null);
     } finally {
       setIsLoadingAi(false);
     }
   };
-
+  
   const handleSaveVersion = () => {
-    if (employees.length === 0) {
-      toast({ title: 'No Data', description: 'Nothing to save.', variant: 'destructive'});
-      return;
-    }
-    const dataStr = JSON.stringify(employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp), null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    link.href = url;
-    link.download = `orgweaver_snapshot_${timestamp}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast({ title: 'Version Saved', description: 'Current hierarchy downloaded as JSON.'});
+    // This is a placeholder for actual save functionality.
+    // In a real app, this would likely involve API calls to a backend.
+    localStorage.setItem(`orgWeaverVersion_${new Date().toISOString()}`, JSON.stringify(employees));
+    toast({
+      title: "Version Saved",
+      description: "Current organization structure has been saved locally.",
+    });
   };
 
   const handlePrintChart = () => {
-    if (currentViewNodes.length === 0) {
-      toast({ title: 'No Data', description: 'Nothing to print.', variant: 'destructive'});
-      return;
-    }
-    try {
-      window.print();
-    } catch (error) {
-      console.error("Print error:", error);
-      const errorMessage = (error instanceof Error) ? error.message : String(error);
-      if (window.self !== window.top && errorMessage.toLowerCase().includes('sandboxed')) {
-         toast({ title: 'Print Error', description: `Printing is restricted in this sandboxed view. Try opening the app in a new tab or after deployment.`, variant: 'destructive'});
-      } else {
-         toast({ title: 'Print Error', description: `Could not open print dialog: ${errorMessage}.`, variant: 'destructive'});
-      }
-    }
+    window.print();
   };
 
-  const handlePageSizeChange = (value: string) => {
-    setPageSize(value as PageSize);
-  };
-
+  const canGoUp = searchTerm.trim() !== '' || viewStack.length > 0;
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full flex-col bg-muted/40">
-        <AppHeader onGoUp={handleGoUp} canGoUp={viewStack.length > 0 && !searchTerm.trim()} />
-        <div className="flex flex-1">
-          <Sidebar collapsible="icon" className="hidden border-r bg-background md:flex" side="left">
-            <SidebarHeader className="p-2">
-              {/* Can add a small logo/title here if sidebar is collapsed */}
-            </SidebarHeader>
-            <ScrollArea className="flex-1">
-              <SidebarContent className="py-2">
-                {sidebarView === 'controls' && (
-                  <>
-                    <SidebarGroup>
-                      <SidebarGroupLabel className="flex items-center"><SearchIcon className="mr-2 h-4 w-4"/>Search</SidebarGroupLabel>
-                      <SidebarInput 
-                        placeholder="Search employees..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </SidebarGroup>
-                    <Separator className="my-4" />
-                    <SidebarGroup>
-                      <SidebarGroupLabel className="flex items-center"><Users className="mr-2 h-4 w-4"/>Data Management</SidebarGroupLabel>
-                      <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setImportModalOpen(true)}>
-                        <Import className="mr-2 h-4 w-4" /> Import Data
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setExportModalOpen(true)}>
-                        <FileOutput className="mr-2 h-4 w-4" /> Export Chart
-                      </Button>
-                       <Button variant="outline" className="w-full justify-start" onClick={handlePrintChart}>
-                        <Printer className="mr-2 h-4 w-4" /> Print Chart
-                      </Button>
-                    </SidebarGroup>
-                    <Separator className="my-4" />
-                     <SidebarGroup>
-                      <SidebarGroupLabel className="flex items-center"><UserPlus className="mr-2 h-4 w-4"/>Add Employee</SidebarGroupLabel>
-                       <Button variant="outline" className="w-full justify-start" onClick={() => { setSelectedNodeId(null); setSidebarView('addEmployee');}}>
-                        <UserPlus className="mr-2 h-4 w-4" /> Add New Employee
-                      </Button>
-                    </SidebarGroup>
-                    <Separator className="my-4" />
-                    <SidebarGroup>
-                       <SidebarGroupLabel className="flex items-center"><Sparkles className="mr-2 h-4 w-4"/>Display Options</SidebarGroupLabel>
-                      <AttributeSelector selectedAttributes={selectedAttributes} onSelectionChange={setSelectedAttributes} />
-                      <div className="mt-3 space-y-1">
-                        <Label htmlFor="pageSizeSelector" className="text-sm font-medium">Page Size</Label>
-                        <Select value={pageSize} onValueChange={handlePageSizeChange}>
-                          <SelectTrigger id="pageSizeSelector" className="w-full">
-                            <SelectValue placeholder="Select page size" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PAGE_SIZE_OPTIONS.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </SidebarGroup>
-                    <Separator className="my-4" />
-                    <SidebarGroup>
-                      <SidebarGroupLabel className="flex items-center"><Brain className="mr-2 h-4 w-4"/>AI Insights</SidebarGroupLabel>
-                      <Button variant="outline" className="w-full justify-start mb-2" onClick={handleGetAiRecommendations}>
-                        <Brain className="mr-2 h-4 w-4" /> Get Recommendations
-                      </Button>
-                       <Button variant="outline" className="w-full justify-start" onClick={() => triggerReorganizationSummary(originalEmployeesForSummary || employees, employees)}>
-                        <ArrowRightLeft className="mr-2 h-4 w-4" /> View Current Summary
-                      </Button>
-                    </SidebarGroup>
-                     <Separator className="my-4" />
-                     <SidebarGroup>
-                      <SidebarGroupLabel className="flex items-center"><Save className="mr-2 h-4 w-4"/>Versioning</SidebarGroupLabel>
-                      <Button variant="outline" className="w-full justify-start" onClick={handleSaveVersion}>
-                        <Save className="mr-2 h-4 w-4" /> Save Current Version
-                      </Button>
-                    </SidebarGroup>
-                  </>
-                )}
-                {sidebarView === 'addEmployee' && (
-                  <SidebarGroup>
-                    <SidebarGroupLabel className="flex items-center"><UserPlus className="mr-2 h-4 w-4"/>Add New Employee</SidebarGroupLabel>
-                    <AddEmployeeForm onSubmit={handleAddEmployee} allEmployees={employees} onCancel={() => setSidebarView('controls')} />
-                  </SidebarGroup>
-                )}
-              </SidebarContent>
-            </ScrollArea>
-            <SidebarFooter>
-              {/* Footer content if any */}
-            </SidebarFooter>
-          </Sidebar>
-
-          <SidebarInset className="flex-1 flex flex-col">
-            <main className="flex-1 p-0 overflow-hidden"> 
-              <HierarchyVisualizer
-                nodes={currentViewNodes}
-                selectedAttributes={selectedAttributes}
-                onSelectNode={handleNodeClick}
-                onEditClick={handleEditEmployeeClick}
-                selectedNodeId={selectedNodeId}
-                pageSize={pageSize}
+    <SidebarProvider defaultOpen>
+      <Sidebar side="left" collapsible="icon" className="bg-sidebar border-sidebar-border">
+        <SidebarHeader>
+          <SidebarTrigger className="md:hidden" />
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]/sidebar:justify-center">
+            <LogoIcon className="size-6 text-primary" />
+            <span className="text-lg font-semibold group-data-[collapsible=icon]/sidebar:hidden">
+              OrgWeaver
+            </span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent asChild>
+          <ScrollArea className="h-full">
+            {sidebarView === 'controls' && (
+              <>
+                <SidebarGroup>
+                  <SidebarGroupLabel className="flex items-center">
+                    <SearchIcon className="mr-2 h-4 w-4" />
+                    Search
+                  </SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarInput 
+                      type="text" 
+                      placeholder="Search employees..." 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </SidebarGroupContent>
+                </SidebarGroup>
+                <SidebarSeparator />
+                <SidebarGroup>
+                  <SidebarGroupLabel>Data Management</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={() => setImportModalOpen(true)}>
+                          <Import className="mr-2" /> Import Data
+                        </Button>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={() => setExportModalOpen(true)}>
+                          <FileOutput className="mr-2" /> Export Data
+                        </Button>
+                      </SidebarMenuItem>
+                       <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={handleSaveVersion}>
+                           <Save className="mr-2" /> Save Version
+                        </Button>
+                      </SidebarMenuItem>
+                       <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={handlePrintChart}>
+                           <Printer className="mr-2" /> Print Chart
+                        </Button>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+                <SidebarSeparator />
+                 <SidebarGroup>
+                  <SidebarGroupLabel>View Options</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                   <AttributeSelector selectedAttributes={selectedAttributes} onSelectionChange={setSelectedAttributes} />
+                    <div className="mt-4">
+                      <Label htmlFor="page-size-select">Page Size</Label>
+                      <Select value={pageSize} onValueChange={(value) => setPageSize(value as PageSize)}>
+                        <SelectTrigger id="page-size-select" className="w-full mt-1">
+                          <SelectValue placeholder="Select page size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAGE_SIZE_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+                <SidebarSeparator />
+                <SidebarGroup>
+                  <SidebarGroupLabel>Actions</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                       <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={() => setSidebarView('addEmployee')}>
+                          <UserPlus className="mr-2" /> Add Employee
+                        </Button>
+                      </SidebarMenuItem>
+                      {selectedNodeId && (
+                        <SidebarMenuItem>
+                           <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" className="w-full justify-start">
+                                <Trash2 className="mr-2" /> Delete Selected
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the employee and reassign their direct reports to their supervisor.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteEmployee(selectedNodeId)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </SidebarMenuItem>
+                      )}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+                <SidebarSeparator />
+                <SidebarGroup>
+                  <SidebarGroupLabel>AI Tools</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start" onClick={handleGetAiRecommendations}>
+                          <Brain className="mr-2" /> Get Recommendations
+                        </Button>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start" 
+                          onClick={() => triggerReorganizationSummary(originalEmployeesForSummary || initialSampleEmployees, employees)}
+                          disabled={!originalEmployeesForSummary && employees.length === initialSampleEmployees.length}
+                        >
+                          <ArrowRightLeft className="mr-2" /> View Reorg Summary
+                        </Button>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </>
+            )}
+            {sidebarView === 'addEmployee' && (
+              <AddEmployeeForm 
+                onSubmit={handleAddEmployee} 
+                allEmployees={employees} 
+                onCancel={() => setSidebarView('controls')} 
               />
-            </main>
-          </SidebarInset>
-        </div>
-      </div>
+            )}
+             {sidebarView === 'editEmployee' && currentEditingEmployee && (
+              <AddEmployeeForm 
+                onSubmit={handleUpdateEmployee}
+                existingEmployee={currentEditingEmployee}
+                allEmployees={employees}
+                onCancel={() => { setSidebarView('controls'); setSelectedNodeId(null); }}
+              />
+            )}
+          </ScrollArea>
+        </SidebarContent>
+        <SidebarFooter className="p-2 group-data-[collapsible=icon]/sidebar:hidden">
+          <div className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} OrgWeaver
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset className="flex flex-col">
+        <AppHeader onGoUp={handleGoUp} canGoUp={canGoUp} />
+        <main className="flex-1 overflow-auto p-4 md:p-6">
+          <HierarchyVisualizer
+            nodes={currentViewNodes}
+            selectedAttributes={selectedAttributes}
+            onSelectNode={handleNodeClick}
+            onEditClick={handleEditEmployeeClick}
+            selectedNodeId={selectedNodeId}
+            pageSize={pageSize}
+          />
+        </main>
+      </SidebarInset>
 
-      <ImportDataModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImport={handleImportData} />
-      <ExportDataModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} employees={employees.map(({children, level, supervisorName, directReportCount, totalReportCount, ...emp}) => emp)} fileNamePrefix="orgweaver_export"/>
-      <AiRecommendationsModal isOpen={isAiModalOpen} onClose={() => setAiModalOpen(false)} recommendationsData={aiRecommendations} isLoading={isLoadingAi} />
-      <ReorganizationSummaryModal isOpen={isSummaryModalOpen} onClose={() => setSummaryModalOpen(false)} summaryData={reorgSummary} isLoading={isLoadingAi} />
-
-      {currentEditingEmployee && (
+      <ImportDataModal
+        isOpen={isImportModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImport={handleImportData}
+      />
+      <ExportDataModal
+        isOpen={isExportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        employees={employees}
+      />
+      <AiRecommendationsModal
+        isOpen={isAiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        recommendationsData={aiRecommendations}
+        isLoading={isLoadingAi}
+      />
+      <ReorganizationSummaryModal
+        isOpen={isSummaryModalOpen}
+        onClose={() => setSummaryModalOpen(false)}
+        summaryData={reorgSummary}
+        isLoading={isLoadingAi}
+      />
+       {currentEditingEmployee && (
         <EditEmployeeModal
-            isOpen={isEditModalOpen}
-            onClose={() => { setEditModalOpen(false); }}
-            employee={currentEditingEmployee}
-            allEmployees={employees}
-            onUpdateEmployee={handleUpdateEmployee}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedNodeId(null); // Clear selection when modal closes
+          }}
+          employee={currentEditingEmployee}
+          allEmployees={employees}
+          onUpdateEmployee={handleUpdateEmployee}
         />
-      )}
-
-      {selectedNodeId && employees.find(e => e.id === selectedNodeId) && (
-         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="fixed bottom-4 right-4 shadow-lg z-20" aria-label="Delete Selected Employee">
-               <Trash2 className="h-5 w-5" /> <span className="ml-2 hidden sm:inline">Delete {employees.find(e => e.id === selectedNodeId)?.employeeName}</span>
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action will delete "{employees.find(e => e.id === selectedNodeId)?.employeeName}".
-                Direct reports will be reassigned to this employee's supervisor or become top-level. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleDeleteEmployee(selectedNodeId)}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       )}
     </SidebarProvider>
   );
