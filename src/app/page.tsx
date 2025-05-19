@@ -128,20 +128,14 @@ export default function OrgWeaverPage() {
     const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
     if (!currentRootId) {
-      // Sort top-level employees alphabetically by name
-      const topLevelEmployees = sourceEmployees.filter(e => !e.supervisorId);
-      topLevelEmployees.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-      
-      return topLevelEmployees.map(emp => buildHierarchyTree(sourceEmployees, emp.id, 0)[0]).filter(Boolean);
-
+      // When at the top level, buildHierarchyTree with null supervisorId returns all top-level nodes
+      // with their respective hierarchies already built.
+      return buildHierarchyTree(sourceEmployees, null, 0);
     } else {
       const rootEmployee = sourceEmployees.find(e => e.id === currentRootId);
       if (!rootEmployee) {
         setViewStack([]); // Reset stack if root employee not found in current source
-         // Sort top-level employees alphabetically by name if resetting
-        const topLevelEmployees = sourceEmployees.filter(e => !e.supervisorId);
-        topLevelEmployees.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-        return topLevelEmployees.map(emp => buildHierarchyTree(sourceEmployees, emp.id, 0)[0]).filter(Boolean);
+        return buildHierarchyTree(sourceEmployees, null, 0); // Show top-level if reset
       }
       // Find the original level of the rootEmployee in the *unfiltered* hierarchy to maintain consistency
       let originalLevel = 0;
@@ -506,8 +500,3 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
-
-    
-
-    
-
