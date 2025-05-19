@@ -11,7 +11,7 @@ import type { Employee, EmployeeNode } from '@/types/org-chart';
 export function buildHierarchyTree(
   employees: Employee[],
   supervisorId: string | null = null,
-  currentLevel: number = 0 // Renamed from level to currentLevel for clarity
+  currentLevel: number = 0
 ): EmployeeNode[] {
   const tree: EmployeeNode[] = [];
   const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
@@ -19,20 +19,25 @@ export function buildHierarchyTree(
   employees.forEach(employee => {
     if (employee.supervisorId === supervisorId) {
       const supervisor = employee.supervisorId ? employeeMap.get(employee.supervisorId) : null;
-      // Recursively build children, incrementing their level
       const children = buildHierarchyTree(employees, employee.id, currentLevel + 1);
+      
+      let totalReportCount = children.length;
+      children.forEach(child => {
+        totalReportCount += child.totalReportCount || 0;
+      });
+
       tree.push({
         ...employee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
         children: children,
-        level: currentLevel, // Set the level for this node
+        level: currentLevel,
+        directReportCount: children.length,
+        totalReportCount: totalReportCount,
       });
     }
   });
 
-  // Sort children by employee name alphabetically
   tree.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-
   return tree;
 }
 
@@ -46,18 +51,16 @@ export function convertToCSV(employees: Employee[]): string {
   if (!employees || employees.length === 0) {
     return "";
   }
-  // Ensure we use a consistent set of headers based on the Employee type
   const headers: (keyof Employee)[] = [
     'id', 'employeeName', 'supervisorId', 'positionTitle', 'jobName', 
     'grade', 'department', 'location', 'proformaCost'
   ];
   
   const csvRows = [
-    headers.join(','), // header row
+    headers.join(','), 
     ...employees.map(row =>
       headers.map(fieldName => {
         const value = row[fieldName];
-        // Handle null or undefined explicitly for CSV representation
         if (value === null || value === undefined) return ''; 
         return JSON.stringify(value);
       }).join(',')
@@ -68,29 +71,30 @@ export function convertToCSV(employees: Employee[]): string {
 
 /**
  * Parses CSV data into an array of Employee objects.
- * Basic parser, assumes CSV format from convertToCSV.
  * @param csvString - The CSV string to parse.
  * @returns An array of Employee objects.
  */
 export function parseCSV(csvString: string): Employee[] {
-  const rows = csvString.trim().split(/\r\n|\n/); // Handle both CRLF and LF line endings
+  const rows = csvString.trim().split(/\r\n|\n/); 
   if (rows.length < 2) return [];
 
-  const headers = rows[0].split(',') as (keyof Employee)[];
+  // Strip potential UTF-8 BOM from headers
+  const headerString = rows[0].charCodeAt(0) === 0xFEFF ? rows[0].substring(1) : rows[0];
+  const headers = headerString.split(',') as (keyof Employee)[];
   const dataRows = rows.slice(1);
 
   return dataRows.map(rowString => {
-    // More robust CSV value splitting, handles quoted commas
     const values = [];
     let currentVal = '';
     let inQuotes = false;
     for (let i = 0; i < rowString.length; i++) {
         const char = rowString[i];
         if (char === '"') {
-            inQuotes = !inQuotes;
-            if (i + 1 < rowString.length && rowString[i+1] === '"') { // Handle escaped quote ""
+            if (inQuotes && i + 1 < rowString.length && rowString[i+1] === '"') { 
                 currentVal += '"';
-                i++; // Skip next quote
+                i++; 
+            } else {
+                inQuotes = !inQuotes;
             }
         } else if (char === ',' && !inQuotes) {
             values.push(currentVal);
@@ -99,34 +103,43 @@ export function parseCSV(csvString: string): Employee[] {
             currentVal += char;
         }
     }
-    values.push(currentVal); // Add the last value
+    values.push(currentVal); 
 
     const employee = {} as Employee;
     headers.forEach((header, index) => {
-      let value = values[index];
-      try {
-        // Only try to parse if it looks like a JSON string (starts with " and ends with ")
-        if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
-          value = JSON.parse(value);
+      let value: string | number | null = values[index] ? values[index].trim() : '';
+      
+      if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
+        try {
+         value = JSON.parse(value); // For values explicitly quoted like "string" or "null"
+        } catch {
+            // If JSON.parse fails, it's likely a string that happens to start/end with quotes,
+            // but isn't a valid JSON string literal (e.g. ""some text"").
+            // In this case, we might want to keep it as is, or remove the outer quotes.
+            // For simplicity here, we'll try to unquote if it looks like simple quotes.
+            if (value.length >=2) value = value.substring(1, value.length -1);
         }
-      } catch {
-        // Keep original value if JSON.parse fails
       }
 
-      if (header === 'proformaCost') {
-        (employee[header] as any) = parseFloat(value) || 0;
-      } else if (header === 'supervisorId') {
-        (employee[header] as any) = value === 'null' || value === '' || value === null ? null : String(value);
-      } else if (header === 'id') {
-        (employee[header] as any) = String(value);
+
+      const cleanHeader = header.trim() as keyof Employee;
+
+      if (cleanHeader === 'proformaCost') {
+        (employee[cleanHeader] as any) = parseFloat(value as string) || 0;
+      } else if (cleanHeader === 'supervisorId') {
+        (employee[cleanHeader] as any) = value === 'null' || value === '' || value === null ? null : String(value);
+      } else if (cleanHeader === 'id') {
+        (employee[cleanHeader] as any) = String(value);
+      } else if (value === 'null' || value === undefined) {
+        (employee[cleanHeader] as any) = undefined; // Store actual undefined for optional fields
       }
       else {
-        (employee[header] as any) = value;
+        (employee[cleanHeader] as any) = value;
       }
     });
-    // Ensure id is a string and proformaCost is a number
     employee.id = String(employee.id);
     employee.proformaCost = Number(employee.proformaCost);
+    if (employee.supervisorId === "null") employee.supervisorId = null; // Ensure "null" string becomes actual null
     return employee;
   });
 }
@@ -140,7 +153,7 @@ export function flattenHierarchyTree(nodes: EmployeeNode[]): Employee[] {
   const flatList: Employee[] = [];
   function traverse(currentNodes: EmployeeNode[]) {
     for (const node of currentNodes) {
-      const { children, supervisorName, level, ...employeeData } = node;
+      const { children, supervisorName, level, directReportCount, totalReportCount, ...employeeData } = node;
       flatList.push(employeeData);
       if (children && children.length > 0) {
         traverse(children);

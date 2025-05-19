@@ -13,9 +13,10 @@ export interface Employee {
 
 export interface EmployeeNode extends Employee {
   children: EmployeeNode[];
-  // For display convenience, can be populated when building the tree
   supervisorName?: string;
   level?: number; // For indentation/styling in the visualizer
+  directReportCount?: number;
+  totalReportCount?: number;
 }
 
 // Defines which attributes can be selected for display in the org chart nodes
