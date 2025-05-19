@@ -10,18 +10,18 @@ interface HierarchyVisualizerProps {
   selectedNodeId?: string | null;
 }
 
-// Define an array of border color classes for nesting indication
-const levelColors = [
-  'border-primary/50',
-  'border-accent/50',
-  'border-destructive/30',
-  'border-yellow-500/50',
-  'border-green-500/50',
-  'border-blue-500/50',
-  'border-indigo-500/50',
-  'border-purple-500/50',
-  'border-pink-500/50',
-];
+// Define an array of border color classes for nesting indication - currently unused due to line removal
+// const levelColors = [
+//   'border-primary/50',
+//   'border-accent/50',
+//   'border-destructive/30',
+//   'border-yellow-500/50',
+//   'border-green-500/50',
+//   'border-blue-500/50',
+//   'border-indigo-500/50',
+//   'border-purple-500/50',
+//   'border-pink-500/50',
+// ];
 
 export function HierarchyVisualizer({
   nodes,
@@ -44,9 +44,10 @@ export function HierarchyVisualizer({
         {node.children && node.children.length > 0 && (
           // Container for the direct reports (children)
           // This will be a flex container to arrange children in columns
+          // Hierarchy line styling (ml-4, pl-3, border-l-2, levelColors) has been removed to test layout
           <div className={cn(
-            "mt-1 ml-4 pl-3 border-l-2 flex flex-wrap justify-center -mx-2", // Negative margin for x-axis gap control
-            levelColors[level % levelColors.length],
+            "mt-1 flex flex-wrap justify-center -mx-2", // Negative margin for x-axis gap control
+            // levelColors[level % levelColors.length], // Line color removed
             "gap-y-2" // Vertical gap for wrapped items
           )}>
             {node.children.map(child => (
