@@ -54,17 +54,16 @@ export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'positionTitle',
   'department',
   'proformaCost',
-  'employeeCategory', // Added Employee Category here
+  'employeeCategory',
 ];
 
 export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
   { value: "Employee", label: "Employee" },
-  { value: "PSA", label: "PSA (Professional Services Agreement)" },
+  { value: "PSA", label: "PSA (Professional Services)" },
   { value: "LSC", label: "LSC (Limited Service Contractor)" },
   { value: "Intern", label: "Intern" },
   { value: "IndividualConsultant", label: "Individual Consultant" },
   { value: "Fellow", label: "Fellow" },
-  // Add more predefined categories here
 ];
 
 
