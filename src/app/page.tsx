@@ -173,13 +173,13 @@ export default function OrgWeaverPage() {
   }, [employees, searchTerm]);
 
   useEffect(() => {
-    const newIsSearchingState = searchTerm.trim() !== '';
-    if (newIsSearchingState !== isCurrentlySearching) {
-      setViewStack([]); // Reset drill-down path when search status (active/inactive) changes
+    const newIsSearching = searchTerm.trim() !== '';
+    if (newIsSearching !== isCurrentlySearching) {
+      setViewStack([]); // Reset drill-down path ONLY when search status flips
       setSelectedNodeId(null); // Reset selection
-      setIsCurrentlySearching(newIsSearchingState);
+      setIsCurrentlySearching(newIsSearching);
     }
-  }, [searchTerm]); // Only dependent on searchTerm to correctly derive isCurrentlySearching
+  }, [searchTerm]); // Only depends on searchTerm. isCurrentlySearching is managed by this effect.
 
 
   const currentViewNodes = useMemo(() => {
@@ -209,8 +209,9 @@ export default function OrgWeaverPage() {
         if (rootNodeFromSearch) {
           return [rootNodeFromSearch]; // Display this node and its (filtered) children
         }
-        // Fallback if currentSearchRootId is not in the current searchResultTree (e.g., search refined)
-        return searchResultTree; // Show top of search results
+        // Fallback if currentSearchRootId is not in the current searchResultTree (e.g., search refined and it's gone)
+        // No setViewStack here. Just return the top level of the current search results.
+        return searchResultTree; 
       }
     } else {
       // Not searching, handle normal drill-down view
@@ -222,11 +223,12 @@ export default function OrgWeaverPage() {
         const rootEmployee = employees.find(e => e.id === currentRootId);
         if (!rootEmployee) {
           // If rootEmployee not found (e.g. deleted), reset view to top level
-          setViewStack([]); 
+          // This scenario should ideally be handled by ensuring viewStack consistency elsewhere,
+          // but as a fallback, returning the top level is safer than erroring.
+          // Consider moving setViewStack([]) to an effect if this becomes problematic.
           return buildHierarchyTree(employees, null, 0);
         }
         
-        // Calculate original level of the rootEmployee for correct display
         let originalLevel = 0;
         let tempSupervisorId = rootEmployee.supervisorId;
         while(tempSupervisorId) {
@@ -235,7 +237,6 @@ export default function OrgWeaverPage() {
           tempSupervisorId = supervisor ? supervisor.supervisorId : null;
         }
 
-        // Build tree for children of this rootEmployee, adjusting their level based on rootEmployee's originalLevel
         const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1);
         const supervisor = rootEmployee.supervisorId ? employees.find(sup => sup.id === rootEmployee.supervisorId) : null;
 
@@ -243,9 +244,9 @@ export default function OrgWeaverPage() {
           ...rootEmployee,
           supervisorName: supervisor ? supervisor.employeeName : undefined,
           children: children,
-          level: originalLevel, // Display root at its original hierarchy depth
-          directReportCount: children.length, // Original direct report count
-          totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length), // Original total
+          level: originalLevel, 
+          directReportCount: children.length, 
+          totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length), 
         };
         return [rootNodeToDisplay];
       }
@@ -314,65 +315,53 @@ export default function OrgWeaverPage() {
     setEmployees(updatedEmployees);
     setViewStack(prevStack => {
         const newStack = prevStack.filter(id => id !== employeeId);
-        if (selectedNodeId === employeeId && newStack.length > 0) {
-            setSelectedNodeId(newStack[newStack.length -1]);
-        } else if (selectedNodeId === employeeId || (selectedNodeId && !updatedEmployees.find(e=>e.id === selectedNodeId))) {
+        // If the deleted node was part of the drill-down path, or was selected
+        if (selectedNodeId === employeeId || (selectedNodeId && !updatedEmployees.find(e=>e.id === selectedNodeId))) {
             setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length -1] : null);
+        }
+        // Ensure viewStack itself is valid
+        if (prevStack.includes(employeeId) && !updatedEmployees.find(e => e.id === newStack[newStack.length -1]) && newStack.length > 0) {
+            return []; // Reset to top if path becomes invalid
         }
         return newStack;
     });
     
-    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been handled.` });
+    toast({ title: 'Employee Deleted', description: `${employeeToDelete.employeeName} and their direct reports (if any) have been reassigned.` });
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
   const handleNodeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId); // Always select the node
+    setSelectedNodeId(nodeId); 
 
     let clickedNodeInView: EmployeeNode | null = null;
-
-    // Find the clicked node within the current view (currentViewNodes)
+    // Robustly find the clicked node within currentViewNodes.
     // currentViewNodes can be:
-    // 1. Full top-level tree (no search, no drill-down) -> multiple items
-    // 2. [selectedRootNode] (no search, drilled down) -> single item
-    // 3. searchResultTree (search, no drill-down) -> multiple items (branches)
-    // 4. [selectedRootNodeFromSearch] (search, drilled down) -> single item
-
+    // 1. Full top-level tree (no search, no drill-down) -> array of roots
+    // 2. [selectedRootNode] (no search, drilled down) -> single item array
+    // 3. searchResultTree (search, no drill-down) -> array of search result branches
+    // 4. [selectedRootNodeFromSearch] (search, drilled down) -> single item array
     if (currentViewNodes.length === 1 && currentViewNodes[0].id === nodeId) {
-      // Case 2 or 4: Clicked on the single root node of a drilled-down view
-      clickedNodeInView = currentViewNodes[0];
-    } else if (currentViewNodes.length === 1 && currentViewNodes[0].children) {
-      // Case 2 or 4: Clicked on a child of the single root node
-      clickedNodeInView = currentViewNodes[0].children.find(child => child.id === nodeId) || null;
+        clickedNodeInView = currentViewNodes[0];
     } else {
-      // Case 1 or 3: Clicked on one of potentially multiple top-level nodes
-      // Or clicked a child of one of these top-level nodes
-      for (const rootNode of currentViewNodes) {
-        if (rootNode.id === nodeId) {
-          clickedNodeInView = rootNode;
-          break;
+        for (const rootNode of currentViewNodes) {
+            if (rootNode.id === nodeId) {
+                clickedNodeInView = rootNode;
+                break;
+            }
+            if (rootNode.children) {
+                const foundChild = rootNode.children.find(child => child.id === nodeId);
+                if (foundChild) {
+                    clickedNodeInView = foundChild;
+                    break;
+                }
+            }
         }
-        if (rootNode.children) {
-          const foundChild = rootNode.children.find(child => child.id === nodeId);
-          if (foundChild) {
-            clickedNodeInView = foundChild;
-            break;
-          }
-        }
-      }
     }
   
     const hasChildrenToDrill = !!(clickedNodeInView?.children && clickedNodeInView.children.length > 0);
-    // Check if the node is already the root of the current drill-down view.
-    // viewStack.includes(nodeId) is more robust than just checking viewStack[viewStack.length -1]
-    // because if currentViewNodes is showing multiple items (top of search/normal view),
-    // viewStack might be empty, but we still don't want to push a top-level item if it's already "root-like".
-    // However, if viewStack is empty, nothing is a "current root" in the stack sense.
     const isCurrentRootOfDrillDown = viewStack.length > 0 && viewStack[viewStack.length -1] === nodeId;
 
     if (hasChildrenToDrill && !isCurrentRootOfDrillDown) {
-      // If the clicked node has children and isn't already the direct root of the current drill-down,
-      // add it to the viewStack to drill into it.
       setViewStack(prevStack => [...prevStack, nodeId]);
     }
   };
@@ -384,8 +373,9 @@ export default function OrgWeaverPage() {
 
 
   const handleGoUp = () => {
+    // If searching and at the top level of search results, clearing search takes precedence.
     if (isCurrentlySearching && viewStack.length === 0) {
-        setSearchTerm(''); 
+        setSearchTerm(''); // This will trigger the useEffect to reset viewStack and isCurrentlySearching
         return;
     }
     
@@ -473,7 +463,10 @@ export default function OrgWeaverPage() {
       });
     }
   };
-
+  
+  // Determine if "Go Up" should be enabled.
+  // It's enabled if drilled down (viewStack not empty) OR
+  // if searching and at the top of search results (viewStack empty but isCurrentlySearching true)
   const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
 
 
