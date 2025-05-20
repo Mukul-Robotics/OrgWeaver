@@ -7,9 +7,9 @@ export interface Employee {
   jobName: string;
   positionNumber: string; // Unique position identifier
   supervisorPositionNumber?: string | null;
-  grade?: string;
+  grade: string; // Made mandatory
   department?: string;
-  location?: string;
+  location: string; // Made mandatory
   proformaCost: number;
   employeeCategory?: string;
 }
@@ -38,7 +38,7 @@ export type DisplayAttributeKey =
   | 'employeeCategory';
 
 export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
-  employeeNumber: "Record ID", // Changed from Employee No. to reflect it can be a vacant position
+  employeeNumber: "Record ID",
   employeeName: "Name",
   supervisorId: "Supervisor Record ID",
   supervisorName: "Supervisor Name",
@@ -71,7 +71,7 @@ export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
   { value: "Intern", label: "Intern" },
   { value: "IndividualConsultant", label: "Individual Consultant" },
   { value: "Fellow", label: "Fellow" },
-  { value: "N/A", label: "N/A (Not Applicable)"}, // Added N/A
+  { value: "N/A", label: "N/A (Not Applicable)"},
 ];
 
 export const PREDEFINED_GRADES: { value: string; label: string }[] = [
@@ -98,7 +98,6 @@ export const PREDEFINED_GRADES: { value: string; label: string }[] = [
   { value: "NOC", label: "NOC" },
   { value: "I2", label: "I2" },
   { value: "I1", label: "I1" },
-  { value: "N/A", label: "N/A (Not Applicable)" }, // Added N/A
 ];
 
 export const PREDEFINED_LOCATIONS: { value: string; label: string }[] = [
@@ -109,7 +108,6 @@ export const PREDEFINED_LOCATIONS: { value: string; label: string }[] = [
   { value: "Berlin", label: "Berlin, Germany" },
   { value: "Singapore", label: "Singapore" },
   { value: "Remote", label: "Remote" },
-  { value: "N/A", label: "N/A (Not Applicable)" }, // Added N/A
 ];
 
 

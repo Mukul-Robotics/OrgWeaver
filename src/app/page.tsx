@@ -31,7 +31,7 @@ import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
 import { LogoIcon } from '@/components/icons/LogoIcon';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
-import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, EMPLOYEE_CATEGORIES, PREDEFINED_GRADES, PREDEFINED_LOCATIONS } from '@/types/org-chart';
+import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, PREDEFINED_GRADES, PREDEFINED_LOCATIONS, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
 import { buildHierarchyTree, calculateTotalProformaCost, generateUniqueID } from '@/lib/orgChartUtils';
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
@@ -61,36 +61,65 @@ import {
 
 
 // Step 1: Define the raw employee data without the derived supervisorPositionNumber
-const rawInitialEmployees: Omit<Employee, 'supervisorPositionNumber' | 'id'>[] = [
-  { employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Staff', grade: 'SG', location: 'NewYork', positionNumber: 'POS001' },
-  { employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Staff', grade: 'ASG', location: 'SanFrancisco', positionNumber: 'POS002' },
-  { employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000, employeeCategory: 'Staff', grade: 'ASG', location: 'NewYork', positionNumber: 'POS003' },
-  { employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000, employeeCategory: 'Staff', grade: 'D2', location: 'Remote', positionNumber: 'POS004' },
-  { employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', location: 'Remote', proformaCost: 150000, employeeCategory: 'Staff', grade: 'P7', positionNumber: 'POS005' },
-  { employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', grade: 'P6', proformaCost: 140000, employeeCategory: 'Staff', location: 'Remote', positionNumber: 'POS006' },
-  { employeeName: 'Gary Goodsupport', supervisorId: '3', positionTitle: 'Support Manager', jobName: 'Support Manager', department: 'Operations', proformaCost: 90000, employeeCategory: 'PSA', grade: 'P4', location: 'London', positionNumber: 'POS007' },
-  { employeeName: 'Helen Helpful', supervisorId: '7', positionTitle: 'Support Specialist', jobName: 'Support Spec.', department: 'Operations', proformaCost: 60000, employeeCategory: 'LSC', grade: 'G6', location: 'London', positionNumber: 'POS008' },
-  { employeeName: 'Ian Intern', supervisorId: '6', positionTitle: 'Software Intern', jobName: 'Intern SDE', department: 'Technology', proformaCost: 40000, employeeCategory: 'Intern', grade: 'I2', location: 'Remote', positionNumber: 'POS009' },
-  { employeeName: 'Jack Consultant', supervisorId: '2', positionTitle: 'Cloud Architect', jobName: 'Consultant Arch.', department: 'Technology', proformaCost: 180000, employeeCategory: 'IndividualConsultant', grade: 'P5', location: 'Remote', positionNumber: 'POS010' },
-  { employeeName: 'Olivia Operator', supervisorId: '3', positionTitle: 'Operations Analyst', jobName: 'Ops Analyst', department: 'Operations', proformaCost: 80000, employeeCategory: 'Staff', grade: 'P3', location: 'NewYork', positionNumber: 'POS011' },
-  { employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff', grade: 'D1', location: 'NewYork', positionNumber: 'POS012' },
-  { employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA', grade: 'G7', location: 'NewYork', positionNumber: 'POS013' },
-  { employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern', grade: 'I1', location: 'NewYork', positionNumber: 'POS014' },
-  // Vacant Positions
-  { employeeName: null, supervisorId: '4', positionTitle: 'Senior Product Manager', jobName: 'Senior PM', department: 'Technology', proformaCost: 160000, employeeCategory: 'N/A', grade: 'P6', location: 'SanFrancisco', positionNumber: 'POS015' },
-  { employeeName: null, supervisorId: '12', positionTitle: 'Compensation Analyst', jobName: 'Comp Analyst', department: 'Human Resources', proformaCost: 85000, employeeCategory: 'N/A', grade: 'P3', location: 'NewYork', positionNumber: 'POS016' },
+const rawInitialEmployees: Omit<Employee, 'supervisorPositionNumber' | 'id' | 'grade' | 'location'>[] = [
+  { employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Staff', positionNumber: 'POS001' },
+  { employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Staff', positionNumber: 'POS002' },
+  { employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000, employeeCategory: 'Staff', positionNumber: 'POS003' },
+  { employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000, employeeCategory: 'Staff', positionNumber: 'POS004' },
+  { employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', proformaCost: 150000, employeeCategory: 'Staff', positionNumber: 'POS005' },
+  { employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', proformaCost: 140000, employeeCategory: 'Staff', positionNumber: 'POS006' },
+  { employeeName: 'Gary Goodsupport', supervisorId: '3', positionTitle: 'Support Manager', jobName: 'Support Manager', department: 'Operations', proformaCost: 90000, employeeCategory: 'PSA', positionNumber: 'POS007' },
+  { employeeName: 'Helen Helpful', supervisorId: '7', positionTitle: 'Support Specialist', jobName: 'Support Spec.', department: 'Operations', proformaCost: 60000, employeeCategory: 'LSC', positionNumber: 'POS008' },
+  { employeeName: 'Ian Intern', supervisorId: '6', positionTitle: 'Software Intern', jobName: 'Intern SDE', department: 'Technology', proformaCost: 40000, employeeCategory: 'Intern', positionNumber: 'POS009' },
+  { employeeName: 'Jack Consultant', supervisorId: '2', positionTitle: 'Cloud Architect', jobName: 'Consultant Arch.', department: 'Technology', proformaCost: 180000, employeeCategory: 'IndividualConsultant', positionNumber: 'POS010' },
+  { employeeName: 'Olivia Operator', supervisorId: '3', positionTitle: 'Operations Analyst', jobName: 'Ops Analyst', department: 'Operations', proformaCost: 80000, employeeCategory: 'Staff', positionNumber: 'POS011' },
+  { employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff', positionNumber: 'POS012' },
+  { employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA', positionNumber: 'POS013' },
+  { employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern', positionNumber: 'POS014' },
+  // Vacant Positions - ensuring they have grade and location
+  { employeeName: null, supervisorId: '4', positionTitle: 'Senior Product Manager', jobName: 'Senior PM', department: 'Technology', proformaCost: 160000, employeeCategory: 'N/A', positionNumber: 'POS015' },
+  { employeeName: null, supervisorId: '12', positionTitle: 'Compensation Analyst', jobName: 'Comp Analyst', department: 'Human Resources', proformaCost: 85000, employeeCategory: 'N/A', positionNumber: 'POS016' },
 ];
 
 // Assign unique IDs to raw employees and build a map for supervisor lookup
-const rawEmployeesWithIds = rawInitialEmployees.map((emp, index) => ({
-  ...emp,
-  id: (index + 1).toString(), // Assign a simple sequential ID for initial data
-}));
+const rawEmployeesWithIdsAndRequiredFields: Omit<Employee, 'supervisorPositionNumber'>[] = rawInitialEmployees.map((emp, index) => {
+  const defaultGrade = PREDEFINED_GRADES[0]?.value || 'P1'; // Fallback if PREDEFINED_GRADES is empty
+  const defaultLocation = PREDEFINED_LOCATIONS[0]?.value || 'Remote'; // Fallback
 
-const employeeIdMapForSetup = new Map(rawEmployeesWithIds.map(emp => [emp.id, emp]));
+  // Assign grades and locations based on role or default
+  let grade = defaultGrade;
+  let location = defaultLocation;
+
+  if (emp.positionNumber === 'POS001') { grade = 'SG'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS002') { grade = 'ASG'; location = 'SanFrancisco'; }
+  else if (emp.positionNumber === 'POS003') { grade = 'ASG'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS004') { grade = 'D2'; location = 'Remote'; }
+  else if (emp.positionNumber === 'POS005') { grade = 'P7'; location = 'Remote'; }
+  else if (emp.positionNumber === 'POS006') { grade = 'P6'; location = 'Remote'; }
+  else if (emp.positionNumber === 'POS007') { grade = 'P4'; location = 'London'; }
+  else if (emp.positionNumber === 'POS008') { grade = 'G6'; location = 'London'; }
+  else if (emp.positionNumber === 'POS009') { grade = 'I2'; location = 'Remote'; }
+  else if (emp.positionNumber === 'POS010') { grade = 'P5'; location = 'Remote'; }
+  else if (emp.positionNumber === 'POS011') { grade = 'P3'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS012') { grade = 'D1'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS013') { grade = 'G7'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS014') { grade = 'I1'; location = 'NewYork'; }
+  else if (emp.positionNumber === 'POS015') { grade = 'P6'; location = 'SanFrancisco'; } // Vacant
+  else if (emp.positionNumber === 'POS016') { grade = 'P3'; location = 'NewYork'; } // Vacant
+  
+  return {
+    ...emp,
+    id: (index + 1).toString(),
+    grade: grade,
+    location: location,
+  };
+});
+
+
+const employeeIdMapForSetup = new Map(rawEmployeesWithIdsAndRequiredFields.map(emp => [emp.id, emp]));
 
 // Step 2: Map over the raw data to create the final initialSampleEmployees, deriving supervisorPositionNumber
-const initialSampleEmployees: Employee[] = rawEmployeesWithIds.map(emp => {
+const initialSampleEmployees: Employee[] = rawEmployeesWithIdsAndRequiredFields.map(emp => {
   const supervisor = emp.supervisorId ? employeeIdMapForSetup.get(emp.supervisorId) : null;
   return {
     ...emp,
@@ -192,49 +221,61 @@ export default function OrgWeaverPage() {
 
  useEffect(() => {
     const newIsSearching = searchTerm.trim() !== '';
-    if (newIsSearching !== isCurrentlySearching) { // Search status flipped
-      setViewStack([]); // Reset drill-down when search starts or stops
+    if (newIsSearching !== isCurrentlySearching) {
+      setViewStack([]); 
       setIsCurrentlySearching(newIsSearching);
     }
 
-    // Handle transitioning from search to specific drill-down
     if (!newIsSearching && pendingDrillDownNodeId) {
-      setViewStack([pendingDrillDownNodeId]);
+      const employeeExists = fullEmployeeMap.has(pendingDrillDownNodeId);
+      if(employeeExists){
+        setViewStack([pendingDrillDownNodeId]);
+      } else {
+         setViewStack([]); // Reset if pending node doesn't exist (e.g. deleted)
+      }
       setPendingDrillDownNodeId(null);
     }
-  }, [searchTerm, isCurrentlySearching, pendingDrillDownNodeId]);
+  }, [searchTerm, isCurrentlySearching, pendingDrillDownNodeId, fullEmployeeMap]);
 
 
   const currentViewNodes = useMemo(() => {
     if (isCurrentlySearching) {
       if (!filteredEmployeeIdsForSearch || filteredEmployeeIdsForSearch.size === 0) return [];
-      const searchResultTree = buildFilteredTreeForSearch(employees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
+      
+      let searchResultTree = buildFilteredTreeForSearch(employees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
       const currentSearchRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
 
       if (!currentSearchRootId) {
         return searchResultTree;
       } else {
-        let rootNodeFromSearch: EmployeeNode | null = null;
-        const findNodeInTreeRecursive = (nodesToSearch: EmployeeNode[], id: string): EmployeeNode | null => {
-          for (const node of nodesToSearch) {
-            if (node.id === id) return node;
-            if (node.children) {
-              const found = findNodeInTreeRecursive(node.children, id);
-              if (found) return found;
+          let rootNodeFromSearch: EmployeeNode | null = null;
+          const findNodeInTreeRecursive = (nodesToSearch: EmployeeNode[], id: string): EmployeeNode | null => {
+            for (const node of nodesToSearch) {
+              if (node.id === id) return node;
+              if (node.children) {
+                const found = findNodeInTreeRecursive(node.children, id);
+                if (found) return found;
+              }
             }
+            return null;
+          };
+          rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
+          
+          if (rootNodeFromSearch) {
+            return [rootNodeFromSearch];
+          } else {
+            // If currentSearchRootId is not found in the filtered tree (e.g. search refined), show top level of current filter
+            return searchResultTree; 
           }
-          return null;
-        };
-        rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
-        return rootNodeFromSearch ? [rootNodeFromSearch] : searchResultTree;
       }
-    } else { // Not searching - normal view
+    } else { 
       const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
       if (!currentRootId) {
         return buildHierarchyTree(employees, null, 0, fullEmployeeMap);
       } else {
         const rootEmployee = fullEmployeeMap.get(currentRootId);
         if (!rootEmployee) {
+          // Fallback if rootEmployee for drill-down not found (e.g., deleted or data issue)
           return buildHierarchyTree(employees, null, 0, fullEmployeeMap);
         }
 
@@ -245,10 +286,10 @@ export default function OrgWeaverPage() {
           const supervisor = fullEmployeeMap.get(tempSupervisorId);
           tempSupervisorId = supervisor ? supervisor.supervisorId : null;
         }
-
+        
         const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
         const supervisor = rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId) : null;
-
+        
         return [{
           ...rootEmployee,
           supervisorName: supervisor?.employeeName,
@@ -287,6 +328,9 @@ export default function OrgWeaverPage() {
         ...newEmployeeData,
         employeeName: employeeName,
         supervisorPositionNumber: supervisor ? supervisor.positionNumber : null,
+        // Grade and Location are now required and should be coming from the form
+        grade: newEmployeeData.grade, 
+        location: newEmployeeData.location,
     };
 
     setOriginalEmployeesForSummary([...employees]);
@@ -315,6 +359,9 @@ export default function OrgWeaverPage() {
       ...updatedEmployeeData,
       employeeName: employeeName,
       supervisorPositionNumber: supervisor ? supervisor.positionNumber : null,
+      // Grade and Location are required
+      grade: updatedEmployeeData.grade,
+      location: updatedEmployeeData.location,
     };
     const updatedEmployees = employees.map(e => e.id === employeeWithSupervisorPos.id ? employeeWithSupervisorPos : e);
     setEmployees(updatedEmployees);
@@ -357,13 +404,15 @@ export default function OrgWeaverPage() {
     const clickedEmployeeOriginal = fullEmployeeMap.get(nodeId);
     if (!clickedEmployeeOriginal) return;
 
+    // Check if the node has children in the original, unfiltered data
     const hasChildrenInOriginalData = employees.some(emp => emp.supervisorId === nodeId);
+    
     const isCurrentRootOfDrillDown = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
 
     if (hasChildrenInOriginalData && !isCurrentRootOfDrillDown) {
         if (isCurrentlySearching) {
-            setPendingDrillDownNodeId(nodeId);
-            setSearchTerm('');
+            setPendingDrillDownNodeId(nodeId); // Set the ID to drill to after search is cleared
+            setSearchTerm(''); // Clear search, which will trigger the useEffect
         } else {
             setViewStack(prevStack => [...prevStack, nodeId]);
         }
@@ -379,6 +428,7 @@ export default function OrgWeaverPage() {
 
   const handleGoUp = () => {
     if (isCurrentlySearching && viewStack.length === 0) {
+        // If searching and at the top level of search results, clearing search term goes "up" to full chart
         setSearchTerm('');
         return;
     }
@@ -619,9 +669,6 @@ export default function OrgWeaverPage() {
                 onSubmit={handleAddEmployee}
                 allEmployees={employees}
                 onCancel={() => setSidebarView('controls')}
-                grades={PREDEFINED_GRADES}
-                locations={PREDEFINED_LOCATIONS}
-                categories={EMPLOYEE_CATEGORIES}
               />
             )}
              {sidebarView === 'editEmployee' && currentEditingEmployee && (
@@ -630,9 +677,6 @@ export default function OrgWeaverPage() {
                 existingEmployee={currentEditingEmployee}
                 allEmployees={employees}
                 onCancel={() => { setSidebarView('controls'); setSelectedNodeId(null); }}
-                grades={PREDEFINED_GRADES}
-                locations={PREDEFINED_LOCATIONS}
-                categories={EMPLOYEE_CATEGORIES}
               />
             )}
           </ScrollArea>

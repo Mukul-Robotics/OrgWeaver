@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { Employee } from '@/types/org-chart';
-import { EMPLOYEE_CATEGORIES, PREDEFINED_GRADES, PREDEFINED_LOCATIONS } from '@/types/org-chart';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -25,17 +24,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { generateUniqueID } from '@/lib/orgChartUtils';
+import { PREDEFINED_GRADES, PREDEFINED_LOCATIONS, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
+
 
 const employeeFormSchema = z.object({
   id: z.string().optional(),
-  employeeName: z.string().nullable().optional(), // Made optional for vacant positions
+  employeeName: z.string().nullable().optional(),
   supervisorId: z.string().nullable().optional(),
   positionTitle: z.string().min(1, { message: "Position title is required." }),
   jobName: z.string().min(1, { message: "Job name is required." }),
   positionNumber: z.string().min(1, {message: "Position number is required."}),
-  grade: z.string().optional(),
+  grade: z.string().min(1, { message: "Grade is required." }),
   department: z.string().optional(),
-  location: z.string().optional(),
+  location: z.string().min(1, { message: "Location is required." }),
   proformaCost: z.coerce.number().min(0, { message: "Proforma cost must be a positive number." }),
   employeeCategory: z.string().optional(),
 });
@@ -47,22 +48,23 @@ interface AddEmployeeFormProps {
   existingEmployee?: Employee | null;
   allEmployees: Employee[];
   onCancel?: () => void;
-  grades: { value: string; label: string }[];
-  locations: { value: string; label: string }[];
-  categories: { value: string; label: string }[];
 }
 
-export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel, grades, locations, categories }: AddEmployeeFormProps) {
+export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel }: AddEmployeeFormProps) {
+  const defaultGrade = PREDEFINED_GRADES.length > 0 ? PREDEFINED_GRADES[0].value : "";
+  const defaultLocation = PREDEFINED_LOCATIONS.length > 0 ? PREDEFINED_LOCATIONS[0].value : "";
+  const defaultCategory = EMPLOYEE_CATEGORIES.length > 0 ? EMPLOYEE_CATEGORIES[0].value : "";
+
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: existingEmployee
       ? {
           ...existingEmployee,
-          employeeName: existingEmployee.employeeName || '', // Keep empty string for form input if null
+          employeeName: existingEmployee.employeeName || '',
           supervisorId: existingEmployee.supervisorId || null,
-          employeeCategory: existingEmployee.employeeCategory || "",
-          grade: existingEmployee.grade || "",
-          location: existingEmployee.location || "",
+          employeeCategory: existingEmployee.employeeCategory || defaultCategory,
+          grade: existingEmployee.grade || defaultGrade,
+          location: existingEmployee.location || defaultLocation,
           positionNumber: existingEmployee.positionNumber || "",
         }
       : {
@@ -70,12 +72,12 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         supervisorId: null,
         positionTitle: '',
         jobName: '',
-        positionNumber: `POS-${generateUniqueID().substring(0,4).toUpperCase()}`, // Suggest a unique position number
-        grade: '',
+        positionNumber: `POS-${generateUniqueID().substring(0,4).toUpperCase()}`,
+        grade: defaultGrade,
         department: '',
-        location: '',
+        location: defaultLocation,
         proformaCost: 0,
-        employeeCategory: '',
+        employeeCategory: defaultCategory,
       },
   });
 
@@ -83,28 +85,27 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
     const employeeData: Omit<Employee, 'supervisorPositionNumber'> = {
       ...values,
       id: existingEmployee?.id || values.id || generateUniqueID(),
-      employeeName: values.employeeName?.trim() ? values.employeeName.trim() : null, // Convert empty string to null
+      employeeName: values.employeeName?.trim() ? values.employeeName.trim() : null,
       supervisorId: values.supervisorId || null,
       proformaCost: Number(values.proformaCost),
-      employeeCategory: values.employeeCategory || undefined,
-      grade: values.grade || undefined,
-      location: values.location || undefined,
+      employeeCategory: values.employeeCategory || undefined, // Keep optional behavior
+      grade: values.grade, // Now required
+      location: values.location, // Now required
       positionNumber: values.positionNumber,
     };
     onSubmit(employeeData);
     if (!existingEmployee) {
-      form.reset({ // Reset with a new suggested position number
-        ...form.formState.defaultValues,
+      form.reset({ 
         employeeName: '',
+        supervisorId: null,
         positionTitle: '',
         jobName: '',
-        supervisorId: null,
         positionNumber: `POS-${generateUniqueID().substring(0,4).toUpperCase()}`,
+        grade: defaultGrade,
         department: '',
+        location: defaultLocation,
         proformaCost: 0,
-        grade: '',
-        location: '',
-        employeeCategory: ''
+        employeeCategory: defaultCategory,
       });
     }
   };
@@ -119,7 +120,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               name="employeeName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Employee Name (optional)</FormLabel>
+                  <FormLabel>Employee Name (optional for vacant)</FormLabel>
                   <FormControl>
                     <Input placeholder="Leave blank for vacant position" {...field} value={field.value || ''} />
                   </FormControl>
@@ -181,7 +182,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                       >
                         <option value="">None (Top Level)</option>
                         {allEmployees
-                          .filter(emp => emp.id !== existingEmployee?.id) // Prevent self-supervision
+                          .filter(emp => emp.id !== existingEmployee?.id) 
                           .sort((a,b) => (a.employeeName || a.positionTitle || '').localeCompare(b.employeeName || b.positionTitle || ''))
                           .map(emp => (
                           <option key={emp.id} value={emp.id}>
@@ -226,15 +227,14 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a grade" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {grades.map(grade => (
+                      {PREDEFINED_GRADES.map(grade => (
                         <SelectItem key={grade.value} value={grade.value}>
                           {grade.label}
                         </SelectItem>
@@ -251,15 +251,14 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a location" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {locations.map(location => (
+                      {PREDEFINED_LOCATIONS.map(location => (
                         <SelectItem key={location.value} value={location.value}>
                           {location.label}
                         </SelectItem>
@@ -283,8 +282,8 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {categories.map(category => (
+                      <SelectItem value="">None (Optional)</SelectItem>
+                      {EMPLOYEE_CATEGORIES.map(category => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
                         </SelectItem>
