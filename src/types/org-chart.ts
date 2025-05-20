@@ -1,12 +1,12 @@
 
 export interface Employee {
-  id: string; // Employee number, must be unique
-  employeeName: string;
-  supervisorId: string | null; // Employee number of the supervisor, null for top-level employees
+  id: string; // Unique record ID
+  employeeName?: string | null; // Name of the employee, optional for vacant positions
+  supervisorId: string | null;
   positionTitle: string;
   jobName: string;
   positionNumber: string; // Unique position identifier
-  supervisorPositionNumber?: string | null; // Position identifier of the supervisor
+  supervisorPositionNumber?: string | null;
   grade?: string;
   department?: string;
   location?: string;
@@ -17,17 +17,16 @@ export interface Employee {
 export interface EmployeeNode extends Employee {
   children: EmployeeNode[];
   supervisorName?: string;
-  level?: number; // For indentation/styling in the visualizer
+  level?: number;
   directReportCount?: number;
   totalReportCount?: number;
 }
 
-// Defines which attributes can be selected for display in the org chart nodes
 export type DisplayAttributeKey =
-  | 'employeeNumber' // alias for id
+  | 'employeeNumber'
   | 'employeeName'
-  | 'supervisorId' // raw supervisor id
-  | 'supervisorName' // derived supervisor name
+  | 'supervisorId'
+  | 'supervisorName'
   | 'positionTitle'
   | 'jobName'
   | 'positionNumber'
@@ -39,9 +38,9 @@ export type DisplayAttributeKey =
   | 'employeeCategory';
 
 export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
-  employeeNumber: "Employee No.",
+  employeeNumber: "Record ID", // Changed from Employee No. to reflect it can be a vacant position
   employeeName: "Name",
-  supervisorId: "Supervisor No.",
+  supervisorId: "Supervisor Record ID",
   supervisorName: "Supervisor Name",
   positionTitle: "Position Title",
   jobName: "Job Name",
@@ -54,7 +53,6 @@ export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
   employeeCategory: "Category",
 };
 
-// Default attributes to display
 export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'employeeName',
   'positionTitle',
@@ -73,33 +71,34 @@ export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
   { value: "Intern", label: "Intern" },
   { value: "IndividualConsultant", label: "Individual Consultant" },
   { value: "Fellow", label: "Fellow" },
+  { value: "N/A", label: "N/A (Not Applicable)"}, // Added N/A
 ];
 
 export const PREDEFINED_GRADES: { value: string; label: string }[] = [
-  { value: "P1", label: "P1" },
-  { value: "P2", label: "P2" },
-  { value: "P3", label: "P3" },
-  { value: "P4", label: "P4" },
-  { value: "P5", label: "P5" },
-  { value: "P6", label: "P6" },
-  { value: "P7", label: "P7" },
-  { value: "D1", label: "D1" },
-  { value: "D2", label: "D2" },
-  { value: "ASG", label: "ASG" },
   { value: "SG", label: "SG" },
-  { value: "G1", label: "G1" },
-  { value: "G2", label: "G2" },
-  { value: "G3", label: "G3" },
-  { value: "G4", label: "G4" },
-  { value: "G5", label: "G5" },
-  { value: "G6", label: "G6" },
+  { value: "ASG", label: "ASG" },
+  { value: "D2", label: "D2" },
+  { value: "D1", label: "D1" },
+  { value: "P7", label: "P7" },
+  { value: "P6", label: "P6" },
+  { value: "P5", label: "P5" },
+  { value: "P4", label: "P4" },
+  { value: "P3", label: "P3" },
+  { value: "P2", label: "P2" },
+  { value: "P1", label: "P1" },
   { value: "G7", label: "G7" },
+  { value: "G6", label: "G6" },
+  { value: "G5", label: "G5" },
+  { value: "G4", label: "G4" },
+  { value: "G3", label: "G3" },
+  { value: "G2", label: "G2" },
+  { value: "G1", label: "G1" },
   { value: "NOA", label: "NOA" },
   { value: "NOB", label: "NOB" },
   { value: "NOC", label: "NOC" },
-  { value: "I1", label: "I1" },
   { value: "I2", label: "I2" },
-  { value: "N/A", label: "N/A" }, // Keeping N/A as a fallback
+  { value: "I1", label: "I1" },
+  { value: "N/A", label: "N/A (Not Applicable)" }, // Added N/A
 ];
 
 export const PREDEFINED_LOCATIONS: { value: string; label: string }[] = [
@@ -110,7 +109,7 @@ export const PREDEFINED_LOCATIONS: { value: string; label: string }[] = [
   { value: "Berlin", label: "Berlin, Germany" },
   { value: "Singapore", label: "Singapore" },
   { value: "Remote", label: "Remote" },
-  { value: "N/A", label: "N/A" },
+  { value: "N/A", label: "N/A (Not Applicable)" }, // Added N/A
 ];
 
 

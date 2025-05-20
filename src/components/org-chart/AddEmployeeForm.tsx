@@ -27,13 +27,12 @@ import {
 import { generateUniqueID } from '@/lib/orgChartUtils';
 
 const employeeFormSchema = z.object({
-  id: z.string().optional(), // Optional for new employees, will be generated
-  employeeName: z.string().min(1, { message: "Employee name is required." }),
+  id: z.string().optional(),
+  employeeName: z.string().nullable().optional(), // Made optional for vacant positions
   supervisorId: z.string().nullable().optional(),
   positionTitle: z.string().min(1, { message: "Position title is required." }),
   jobName: z.string().min(1, { message: "Job name is required." }),
   positionNumber: z.string().min(1, {message: "Position number is required."}),
-  // supervisorPositionNumber is derived, not directly edited.
   grade: z.string().optional(),
   department: z.string().optional(),
   location: z.string().optional(),
@@ -44,19 +43,23 @@ const employeeFormSchema = z.object({
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
 
 interface AddEmployeeFormProps {
-  onSubmit: (employee: Omit<Employee, 'supervisorPositionNumber'>) => void; // onSubmit now expects data without supervisorPositionNumber
+  onSubmit: (employee: Omit<Employee, 'supervisorPositionNumber'>) => void;
   existingEmployee?: Employee | null;
-  allEmployees: Employee[]; // For supervisor selection
+  allEmployees: Employee[];
   onCancel?: () => void;
+  grades: { value: string; label: string }[];
+  locations: { value: string; label: string }[];
+  categories: { value: string; label: string }[];
 }
 
-export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel }: AddEmployeeFormProps) {
+export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel, grades, locations, categories }: AddEmployeeFormProps) {
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: existingEmployee
-      ? { 
-          ...existingEmployee, 
-          supervisorId: existingEmployee.supervisorId || null, 
+      ? {
+          ...existingEmployee,
+          employeeName: existingEmployee.employeeName || '', // Keep empty string for form input if null
+          supervisorId: existingEmployee.supervisorId || null,
           employeeCategory: existingEmployee.employeeCategory || "",
           grade: existingEmployee.grade || "",
           location: existingEmployee.location || "",
@@ -67,7 +70,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         supervisorId: null,
         positionTitle: '',
         jobName: '',
-        positionNumber: '',
+        positionNumber: `POS-${generateUniqueID().substring(0,4).toUpperCase()}`, // Suggest a unique position number
         grade: '',
         department: '',
         location: '',
@@ -77,11 +80,10 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
   });
 
   const handleSubmit = (values: EmployeeFormData) => {
-    // supervisorPositionNumber is derived in the parent component (OrgWeaverPage)
-    // when the supervisorId changes or when an employee is added/updated.
     const employeeData: Omit<Employee, 'supervisorPositionNumber'> = {
       ...values,
       id: existingEmployee?.id || values.id || generateUniqueID(),
+      employeeName: values.employeeName?.trim() ? values.employeeName.trim() : null, // Convert empty string to null
       supervisorId: values.supervisorId || null,
       proformaCost: Number(values.proformaCost),
       employeeCategory: values.employeeCategory || undefined,
@@ -91,7 +93,19 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
     };
     onSubmit(employeeData);
     if (!existingEmployee) {
-      form.reset();
+      form.reset({ // Reset with a new suggested position number
+        ...form.formState.defaultValues,
+        employeeName: '',
+        positionTitle: '',
+        jobName: '',
+        supervisorId: null,
+        positionNumber: `POS-${generateUniqueID().substring(0,4).toUpperCase()}`,
+        department: '',
+        proformaCost: 0,
+        grade: '',
+        location: '',
+        employeeCategory: ''
+      });
     }
   };
 
@@ -105,9 +119,9 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               name="employeeName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Employee Name</FormLabel>
+                  <FormLabel>Employee Name (optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Jane Doe" {...field} />
+                    <Input placeholder="Leave blank for vacant position" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -157,7 +171,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               name="supervisorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supervisor (Employee ID)</FormLabel>
+                  <FormLabel>Supervisor (Position Number)</FormLabel>
                   <FormControl>
                      <select
                         {...field}
@@ -167,10 +181,11 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                       >
                         <option value="">None (Top Level)</option>
                         {allEmployees
-                          .filter(emp => emp.id !== existingEmployee?.id)
+                          .filter(emp => emp.id !== existingEmployee?.id) // Prevent self-supervision
+                          .sort((a,b) => (a.employeeName || a.positionTitle || '').localeCompare(b.employeeName || b.positionTitle || ''))
                           .map(emp => (
                           <option key={emp.id} value={emp.id}>
-                            {emp.employeeName} ({emp.id}) - Pos: {emp.positionNumber}
+                            {emp.employeeName || `Vacant: ${emp.positionTitle}`} (Pos: {emp.positionNumber})
                           </option>
                         ))}
                       </select>
@@ -219,7 +234,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {PREDEFINED_GRADES.map(grade => (
+                      {grades.map(grade => (
                         <SelectItem key={grade.value} value={grade.value}>
                           {grade.label}
                         </SelectItem>
@@ -244,7 +259,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {PREDEFINED_LOCATIONS.map(location => (
+                      {locations.map(location => (
                         <SelectItem key={location.value} value={location.value}>
                           {location.label}
                         </SelectItem>
@@ -269,7 +284,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {EMPLOYEE_CATEGORIES.map(category => (
+                      {categories.map(category => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
                         </SelectItem>
@@ -284,7 +299,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         </ScrollArea>
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>}
-          <Button type="submit">{existingEmployee ? 'Update Employee' : 'Add Employee'}</Button>
+          <Button type="submit">{existingEmployee ? 'Update Position' : 'Add Position'}</Button>
         </div>
       </form>
     </Form>
