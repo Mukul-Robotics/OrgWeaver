@@ -42,12 +42,13 @@ const renderEmployeeSegment = (
       />
       {node.children && node.children.length > 0 && (
         <div className={cn(
-          "mt-2 grid gap-3 pl-4 border-l-2 border-muted",
-          // Adjusted grid columns for a maximum of 4 boxes
-          "grid-cols-1",
-          "sm:grid-cols-2",
-          "md:grid-cols-3",
-          "lg:grid-cols-4" // Max 4 columns on large screens and up
+          "mt-2 grid gap-3", // Removed pl-4 border-l-2 border-muted
+          // Default to 2 columns on smallest screens
+          "grid-cols-2",
+          // 3 columns on small screens (640px+)
+          "sm:grid-cols-3",
+          // 4 columns on medium screens (768px+) and up (covers A4 Portrait and wider)
+          "md:grid-cols-4"
         )}>
           {node.children.map(childNode => (
             <OrgChartNodeCard
@@ -108,3 +109,4 @@ export function HierarchyVisualizer({
     </div>
   );
 }
+
