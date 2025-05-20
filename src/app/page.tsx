@@ -28,7 +28,6 @@ import { ExportDataModal } from '@/components/modals/ExportDataModal';
 import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsModal';
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
-// import { SubmitApprovalModal } from '@/components/modals/SubmitApprovalModal'; // Removed
 import { LogoIcon } from '@/components/icons/LogoIcon';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
@@ -37,7 +36,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, generateUniqueID } from
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react'; // Removed Send icon
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -63,20 +62,20 @@ import {
 
 // Sample Data (can be replaced by actual import)
 const initialSampleEmployees: Employee[] = [
-  { id: '1', employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Staff' },
-  { id: '2', employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Staff' },
-  { id: '3', employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000, employeeCategory: 'Staff' },
-  { id: '4', employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000, employeeCategory: 'Staff' },
-  { id: '5', employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', location: 'Remote', proformaCost: 150000, employeeCategory: 'Staff' },
-  { id: '6', employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', grade: 'L6', proformaCost: 140000, employeeCategory: 'Staff' },
-  { id: '7', employeeName: 'Gary Goodsupport', supervisorId: '3', positionTitle: 'Support Manager', jobName: 'Support Manager', department: 'Operations', proformaCost: 90000, employeeCategory: 'PSA' },
-  { id: '8', employeeName: 'Helen Helpful', supervisorId: '7', positionTitle: 'Support Specialist', jobName: 'Support Spec.', department: 'Operations', proformaCost: 60000, employeeCategory: 'LSC' },
-  { id: '9', employeeName: 'Ian Intern', supervisorId: '6', positionTitle: 'Software Intern', jobName: 'Intern SDE', department: 'Technology', proformaCost: 40000, employeeCategory: 'Intern' },
-  { id: '10', employeeName: 'Jack Consultant', supervisorId: '2', positionTitle: 'Cloud Architect', jobName: 'Consultant Arch.', department: 'Technology', proformaCost: 180000, employeeCategory: 'IndividualConsultant' },
-  { id: '11', employeeName: 'Olivia Operator', supervisorId: '3', positionTitle: 'Operations Analyst', jobName: 'Ops Analyst', department: 'Operations', proformaCost: 80000, employeeCategory: 'Staff' },
-  { id: '12', employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff' },
-  { id: '13', employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA' },
-  { id: '14', employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern' },
+  { id: '1', employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Staff', grade: 'CSuite', location: 'NewYork' },
+  { id: '2', employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Staff', grade: 'SVP', location: 'SanFrancisco' },
+  { id: '3', employeeName: 'Charlie Brown', supervisorId: '1', positionTitle: 'COO', jobName: 'Chief Operating Officer', department: 'Operations', proformaCost: 240000, employeeCategory: 'Staff', grade: 'SVP', location: 'NewYork' },
+  { id: '4', employeeName: 'Diana Prince', supervisorId: '2', positionTitle: 'VP Engineering', jobName: 'VP Engineering', department: 'Technology', proformaCost: 200000, employeeCategory: 'Staff', grade: 'VP', location: 'Remote' },
+  { id: '5', employeeName: 'Edward Scissorhands', supervisorId: '4', positionTitle: 'Software Engineer Lead', jobName: 'Team Lead', department: 'Technology', location: 'Remote', proformaCost: 150000, employeeCategory: 'Staff', grade: 'L5' },
+  { id: '6', employeeName: 'Fiona Apple', supervisorId: '4', positionTitle: 'Senior Software Engineer', jobName: 'Senior SDE', department: 'Technology', grade: 'L6', proformaCost: 140000, employeeCategory: 'Staff', location: 'Remote' },
+  { id: '7', employeeName: 'Gary Goodsupport', supervisorId: '3', positionTitle: 'Support Manager', jobName: 'Support Manager', department: 'Operations', proformaCost: 90000, employeeCategory: 'PSA', grade: 'L4', location: 'London' },
+  { id: '8', employeeName: 'Helen Helpful', supervisorId: '7', positionTitle: 'Support Specialist', jobName: 'Support Spec.', department: 'Operations', proformaCost: 60000, employeeCategory: 'LSC', grade: 'L2', location: 'London' },
+  { id: '9', employeeName: 'Ian Intern', supervisorId: '6', positionTitle: 'Software Intern', jobName: 'Intern SDE', department: 'Technology', proformaCost: 40000, employeeCategory: 'Intern', grade: 'InternG', location: 'Remote' },
+  { id: '10', employeeName: 'Jack Consultant', supervisorId: '2', positionTitle: 'Cloud Architect', jobName: 'Consultant Arch.', department: 'Technology', proformaCost: 180000, employeeCategory: 'IndividualConsultant', grade: 'ConsultantG', location: 'Remote' },
+  { id: '11', employeeName: 'Olivia Operator', supervisorId: '3', positionTitle: 'Operations Analyst', jobName: 'Ops Analyst', department: 'Operations', proformaCost: 80000, employeeCategory: 'Staff', grade: 'L3', location: 'NewYork' },
+  { id: '12', employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff', grade: 'VP', location: 'NewYork' },
+  { id: '13', employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA', grade: 'L3', location: 'NewYork' },
+  { id: '14', employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern', grade: 'InternG', location: 'NewYork' },
 ];
 
 
@@ -131,7 +130,6 @@ export default function OrgWeaverPage() {
   const [isAiModalOpen, setAiModalOpen] = useState(false);
   const [isSummaryModalOpen, setSummaryModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
-  // const [isSubmitApprovalModalOpen, setSubmitApprovalModalOpen] = useState(false); // Removed state for approval modal
 
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendationsData | null>(null);
   const [reorgSummary, setReorgSummary] = useState<ReorganizationSummaryData | null>(null);
@@ -172,12 +170,12 @@ export default function OrgWeaverPage() {
 
  useEffect(() => {
     const newIsSearching = searchTerm.trim() !== '';
-    if (newIsSearching !== isCurrentlySearching) {
-      setViewStack([]); 
-      setSelectedNodeId(null);
-      setIsCurrentlySearching(newIsSearching); 
+    if (newIsSearching !== isCurrentlySearching) { // Search status flipped
+      setViewStack([]); // Reset drill-down when search starts or stops
+      setIsCurrentlySearching(newIsSearching);
     }
-    
+
+    // Handle transitioning from search to specific drill-down
     if (!newIsSearching && pendingDrillDownNodeId) {
       setViewStack([pendingDrillDownNodeId]);
       setPendingDrillDownNodeId(null);
@@ -206,18 +204,21 @@ export default function OrgWeaverPage() {
           return null;
         };
         rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
+        // If the drilled-down node is no longer in the filtered tree, show the top of the current search results.
         return rootNodeFromSearch ? [rootNodeFromSearch] : searchResultTree; 
       }
-    } else {
+    } else { // Not searching - normal view
       const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
       if (!currentRootId) {
         return buildHierarchyTree(employees, null, 0);
       } else {
         const rootEmployee = fullEmployeeMap.get(currentRootId);
         if (!rootEmployee) {
+          // If root employee for drill-down doesn't exist (e.g. deleted), go to top level.
           return buildHierarchyTree(employees, null, 0); 
         }
         
+        // Calculate original level of the rootEmployee in the full tree
         let originalLevel = 0;
         let tempSupervisorId = rootEmployee.supervisorId;
         while(tempSupervisorId) {
@@ -303,9 +304,12 @@ export default function OrgWeaverPage() {
     setEmployees(updatedEmployees);
     setViewStack(prevStack => {
         const newStack = prevStack.filter(id => id !== employeeId);
+        // If the deleted node was the selected one, or if selected node is no longer in the list
         if (selectedNodeId === employeeId || (selectedNodeId && !updatedEmployees.find(e=>e.id === selectedNodeId))) {
+            // Select the new top of the stack if stack is not empty, otherwise null
             setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length -1] : null);
         }
+        // If the deleted node was part of the view stack, and the new top of stack is not valid, reset view to top.
         if (prevStack.includes(employeeId) && !updatedEmployees.find(e => e.id === newStack[newStack.length -1]) && newStack.length > 0) {
             return []; 
         }
@@ -324,14 +328,17 @@ export default function OrgWeaverPage() {
         return;
     }
     
+    // Check against the full employee list for children
     const hasChildrenInOriginalData = employees.some(emp => emp.supervisorId === nodeId);
     const isCurrentRootOfDrillDown = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
 
     if (hasChildrenInOriginalData && !isCurrentRootOfDrillDown) {
         if (isCurrentlySearching) {
+            // If searching and click a node with children, prepare to drill down after clearing search
             setPendingDrillDownNodeId(nodeId);
-            setSearchTerm(''); 
+            setSearchTerm(''); // This will trigger useEffect to handle the drill-down
         } else { 
+            // Not searching, normal drill-down
             setViewStack(prevStack => [...prevStack, nodeId]);
         }
     }
@@ -344,8 +351,9 @@ export default function OrgWeaverPage() {
 
 
   const handleGoUp = () => {
+    // If searching and at the top of search results, clearing search takes precedence over stack pop
     if (isCurrentlySearching && viewStack.length === 0) {
-        setSearchTerm(''); 
+        setSearchTerm(''); // This will reset viewStack via useEffect
         return;
     }
     
@@ -433,14 +441,6 @@ export default function OrgWeaverPage() {
       });
     }
   };
-
-  // const handleSubmitForApproval = () => { // Removed
-  //   if (employees.length === 0) {
-  //       toast({ title: 'No Data', description: 'Cannot submit an empty organization for approval.', variant: 'destructive' });
-  //       return;
-  //   }
-  //   setSubmitApprovalModalOpen(true);
-  // };
   
   const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
 
@@ -560,13 +560,6 @@ export default function OrgWeaverPage() {
                           </AlertDialog>
                         </SidebarMenuItem>
                       )}
-                       {/* Removed Submit for Approval Button
-                       <SidebarMenuItem>
-                        <Button variant="outline" className="w-full justify-start text-primary hover:text-primary hover:bg-primary/10 border-primary/50" onClick={handleSubmitForApproval}>
-                          <Send className="mr-2" /> Submit for Approval
-                        </Button>
-                      </SidebarMenuItem>
-                      */}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
@@ -666,17 +659,6 @@ export default function OrgWeaverPage() {
           onUpdateEmployee={handleUpdateEmployee}
         />
       )}
-      {/* Removed SubmitApprovalModal instance
-      <SubmitApprovalModal
-        isOpen={isSubmitApprovalModalOpen}
-        onClose={() => setSubmitApprovalModalOpen(false)}
-        onSubmit={() => {
-            // In a real app, this would call a backend API
-            toast({ title: 'Submission Sent (Placeholder)', description: 'Your organization chart has been submitted for approval.'});
-            setSubmitApprovalModalOpen(false);
-        }}
-      />
-      */}
     </SidebarProvider>
   );
 }

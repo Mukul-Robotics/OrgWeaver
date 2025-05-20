@@ -55,6 +55,8 @@ export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'department',
   'proformaCost',
   'employeeCategory',
+  'grade',
+  'location',
 ];
 
 export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
@@ -64,6 +66,34 @@ export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
   { value: "Intern", label: "Intern" },
   { value: "IndividualConsultant", label: "Individual Consultant" },
   { value: "Fellow", label: "Fellow" },
+];
+
+export const PREDEFINED_GRADES: { value: string; label: string }[] = [
+  { value: "L1", label: "L1 - Associate" },
+  { value: "L2", label: "L2 - Analyst" },
+  { value: "L3", label: "L3 - Senior Analyst" },
+  { value: "L4", label: "L4 - Manager" },
+  { value: "L5", label: "L5 - Senior Manager" },
+  { value: "L6", label: "L6 - Director" },
+  { value: "L7", label: "L7 - Senior Director" },
+  { value: "VP", label: "VP - Vice President" },
+  { value: "SVP", label: "SVP - Senior Vice President" },
+  { value: "CSuite", label: "C-Suite" },
+  { value: "InternG", label: "Intern Grade" },
+  { value: "ConsultantG", label: "Consultant Grade" },
+  { value: "FellowG", label: "Fellow Grade" },
+  { value: "N/A", label: "N/A" },
+];
+
+export const PREDEFINED_LOCATIONS: { value: string; label: string }[] = [
+  { value: "NewYork", label: "New York, USA" },
+  { value: "London", label: "London, UK" },
+  { value: "Tokyo", label: "Tokyo, Japan" },
+  { value: "SanFrancisco", label: "San Francisco, USA" },
+  { value: "Berlin", label: "Berlin, Germany" },
+  { value: "Singapore", label: "Singapore" },
+  { value: "Remote", label: "Remote" },
+  { value: "N/A", label: "N/A" },
 ];
 
 

@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { Employee } from '@/types/org-chart';
-import { EMPLOYEE_CATEGORIES } from '@/types/org-chart';
+import { EMPLOYEE_CATEGORIES, PREDEFINED_GRADES, PREDEFINED_LOCATIONS } from '@/types/org-chart';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -52,7 +52,13 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: existingEmployee
-      ? { ...existingEmployee, supervisorId: existingEmployee.supervisorId || null, employeeCategory: existingEmployee.employeeCategory || "" }
+      ? { 
+          ...existingEmployee, 
+          supervisorId: existingEmployee.supervisorId || null, 
+          employeeCategory: existingEmployee.employeeCategory || "",
+          grade: existingEmployee.grade || "",
+          location: existingEmployee.location || "",
+        }
       : {
         employeeName: '',
         supervisorId: null,
@@ -73,6 +79,8 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
       supervisorId: values.supervisorId || null,
       proformaCost: Number(values.proformaCost),
       employeeCategory: values.employeeCategory || undefined,
+      grade: values.grade || undefined,
+      location: values.location || undefined,
     };
     onSubmit(employeeData);
     if (!existingEmployee) {
@@ -183,9 +191,21 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grade</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. L5" {...field} value={field.value || ''} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a grade" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {PREDEFINED_GRADES.map(grade => (
+                        <SelectItem key={grade.value} value={grade.value}>
+                          {grade.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -196,9 +216,21 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. New York" {...field} value={field.value || ''} />
-                  </FormControl>
+                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a location" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {PREDEFINED_LOCATIONS.map(location => (
+                        <SelectItem key={location.value} value={location.value}>
+                          {location.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
