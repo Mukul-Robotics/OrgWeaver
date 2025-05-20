@@ -13,14 +13,14 @@ interface OrgChartNodeCardProps {
   onEditClick?: (nodeId: string) => void;
   isSelected?: boolean;
   className?: string;
-  hasChildren?: boolean;
+  hasChildren?: boolean; // This prop is now used to determine if the Chevron should show
 }
 
 const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = {
   employeeNumber: Hash,
   employeeName: UserCheck,
-  supervisorId: ShieldAlert,
-  supervisorName: ShieldAlert,
+  supervisorId: ShieldAlert, // Icon for Supervisor Record ID
+  supervisorName: ShieldAlert, // Icon for Supervisor Name
   positionTitle: Briefcase,
   jobName: Briefcase,
   positionNumber: SquareAsterisk,
@@ -39,10 +39,10 @@ const categoryBorderColors: Record<string, string> = {
   'Intern': 'border-pink-500',
   'IndividualConsultant': 'border-cyan-500',
   'Fellow': 'border-indigo-500',
-  'N/A': 'border-dashed border-muted-foreground',
+  'N/A': 'border-dashed border-muted-foreground', // For vacant positions if category is not set
 };
 
-export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className }: OrgChartNodeCardProps) {
+export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className, hasChildren }: OrgChartNodeCardProps) {
   const isVacant = !node.employeeName;
   const displayName = node.employeeName || "Vacant Position";
   const displayTitle = node.employeeName ? node.employeeName : "Vacant Position";
@@ -53,7 +53,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
 
 
   const getDisplayValue = (attrKey: DisplayAttributeKey): string | number | null | undefined => {
-    if (attrKey === 'employeeNumber' && node.id === node[attrKey as keyof EmployeeNode] && !selectedAttributes.includes('employeeNumber')) return undefined; // Don't show if not explicitly selected
+    if (attrKey === 'employeeNumber' && node.id === node[attrKey as keyof EmployeeNode] && !selectedAttributes.includes('employeeNumber')) return undefined;
     if (attrKey === 'supervisorId' && selectedAttributes.includes('supervisorName') && node.supervisorName) return undefined;
     if (attrKey === 'supervisorId' && !node.supervisorId) return undefined;
     if (attrKey === 'supervisorPositionNumber' && !node.supervisorPositionNumber) return undefined;
@@ -63,12 +63,12 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
     return node[attrKey as keyof EmployeeNode];
   }
 
-  const hasReports = (node.totalReportCount ?? 0) > 0;
+  const actualHasChildren = (node.directReportCount ?? 0) > 0; // Use directReportCount
 
   return (
     <Card
       className={cn(
-        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full`, // Removed h-[160px]
+        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full flex flex-col`, // Added flex flex-col
         onSelectNode ? 'cursor-pointer' : '',
         isSelected ? 'ring-2 ring-primary' : '',
         categoryBorderClass,
@@ -77,7 +77,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
       )}
       onClick={onSelectNode ? () => onSelectNode(node.id) : undefined}
       aria-selected={isSelected}
-      aria-haspopup={node.children && node.children.length > 0 ? "tree" : undefined}
+      aria-haspopup={actualHasChildren ? "tree" : undefined}
     >
       <CardHeader className="p-1.5 pb-0">
         <div className="flex items-center justify-between">
@@ -86,6 +86,9 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
             <span className="truncate" title={displayTitle}>{displayName}</span>
           </CardTitle>
           <div className="flex items-center space-x-1 shrink-0">
+             {actualHasChildren && ( // Check actualHasChildren instead of hasChildren prop
+              <ChevronsUpDownIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
             {onEditClick && (
               <button
                 onClick={(e) => {
@@ -103,12 +106,12 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
         </div>
         <CardDescription className="text-xs truncate" title={`${node.positionTitle} (${node.positionNumber})`}>{node.positionTitle} ({node.positionNumber})</CardDescription>
       </CardHeader>
-      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5"> {/* Removed flex-1 overflow-y-auto flex flex-col */}
-        <div> {/* Replaced flex-grow div */}
+      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5 flex-grow"> {/* Added flex-grow */}
+        <div> 
           {selectedAttributes.map((attrKey) => {
             const value = getDisplayValue(attrKey);
             if (value === undefined || value === null || value === '') return null;
-            if (attrKey === 'employeeName' || attrKey === 'positionTitle' || attrKey === 'positionNumber') return null; // Already displayed in header/description
+            if (attrKey === 'employeeName' || attrKey === 'positionTitle' || attrKey === 'positionNumber') return null; 
             if (attrKey === 'employeeNumber' && node.id === value && !selectedAttributes.includes('employeeNumber')) return null;
 
             const Icon = attributeIcons[attrKey];
@@ -128,8 +131,8 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
             <Badge variant="secondary" className="mt-0.5 text-xs py-0 px-1">{node.department}</Badge>
           )}
         </div>
-        {hasReports && (
-          <div className="pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1"> {/* Removed mt-auto */}
+        {(node.directReportCount ?? 0) > 0 && ( // Use directReportCount here
+          <div className="pt-1 mt-auto text-right text-xs text-muted-foreground flex items-center justify-end space-x-1"> 
             <Users2 className="h-3 w-3" />
             <span title="Direct Reports">D:{node.directReportCount ?? 0}</span>
             <span>/</span>
