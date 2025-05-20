@@ -28,7 +28,7 @@ import { ExportDataModal } from '@/components/modals/ExportDataModal';
 import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsModal';
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
-import { SubmitApprovalModal } from '@/components/modals/SubmitApprovalModal'; // New Modal
+// import { SubmitApprovalModal } from '@/components/modals/SubmitApprovalModal'; // Removed
 import { LogoIcon } from '@/components/icons/LogoIcon';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
@@ -37,7 +37,7 @@ import { buildHierarchyTree, calculateTotalProformaCost, generateUniqueID } from
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon, Send } from 'lucide-react'; // Added Send icon
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react'; // Removed Send icon
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -131,7 +131,7 @@ export default function OrgWeaverPage() {
   const [isAiModalOpen, setAiModalOpen] = useState(false);
   const [isSummaryModalOpen, setSummaryModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
-  const [isSubmitApprovalModalOpen, setSubmitApprovalModalOpen] = useState(false); // New state for approval modal
+  // const [isSubmitApprovalModalOpen, setSubmitApprovalModalOpen] = useState(false); // Removed state for approval modal
 
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendationsData | null>(null);
   const [reorgSummary, setReorgSummary] = useState<ReorganizationSummaryData | null>(null);
@@ -434,13 +434,13 @@ export default function OrgWeaverPage() {
     }
   };
 
-  const handleSubmitForApproval = () => {
-    if (employees.length === 0) {
-        toast({ title: 'No Data', description: 'Cannot submit an empty organization for approval.', variant: 'destructive' });
-        return;
-    }
-    setSubmitApprovalModalOpen(true);
-  };
+  // const handleSubmitForApproval = () => { // Removed
+  //   if (employees.length === 0) {
+  //       toast({ title: 'No Data', description: 'Cannot submit an empty organization for approval.', variant: 'destructive' });
+  //       return;
+  //   }
+  //   setSubmitApprovalModalOpen(true);
+  // };
   
   const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
 
@@ -560,11 +560,13 @@ export default function OrgWeaverPage() {
                           </AlertDialog>
                         </SidebarMenuItem>
                       )}
+                       {/* Removed Submit for Approval Button
                        <SidebarMenuItem>
                         <Button variant="outline" className="w-full justify-start text-primary hover:text-primary hover:bg-primary/10 border-primary/50" onClick={handleSubmitForApproval}>
                           <Send className="mr-2" /> Submit for Approval
                         </Button>
                       </SidebarMenuItem>
+                      */}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
@@ -664,6 +666,7 @@ export default function OrgWeaverPage() {
           onUpdateEmployee={handleUpdateEmployee}
         />
       )}
+      {/* Removed SubmitApprovalModal instance
       <SubmitApprovalModal
         isOpen={isSubmitApprovalModalOpen}
         onClose={() => setSubmitApprovalModalOpen(false)}
@@ -673,6 +676,7 @@ export default function OrgWeaverPage() {
             setSubmitApprovalModalOpen(false);
         }}
       />
+      */}
     </SidebarProvider>
   );
 }
