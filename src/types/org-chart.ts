@@ -5,6 +5,8 @@ export interface Employee {
   supervisorId: string | null; // Employee number of the supervisor, null for top-level employees
   positionTitle: string;
   jobName: string;
+  positionNumber: string; // Unique position identifier
+  supervisorPositionNumber?: string | null; // Position identifier of the supervisor
   grade?: string;
   department?: string;
   location?: string;
@@ -28,6 +30,8 @@ export type DisplayAttributeKey =
   | 'supervisorName' // derived supervisor name
   | 'positionTitle'
   | 'jobName'
+  | 'positionNumber'
+  | 'supervisorPositionNumber'
   | 'grade'
   | 'department'
   | 'location'
@@ -41,6 +45,8 @@ export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
   supervisorName: "Supervisor Name",
   positionTitle: "Position Title",
   jobName: "Job Name",
+  positionNumber: "Position No.",
+  supervisorPositionNumber: "Supervisor Pos. No.",
   grade: "Grade",
   department: "Department",
   location: "Location",
@@ -52,6 +58,7 @@ export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
 export const DEFAULT_DISPLAY_ATTRIBUTES: DisplayAttributeKey[] = [
   'employeeName',
   'positionTitle',
+  'positionNumber',
   'department',
   'proformaCost',
   'employeeCategory',

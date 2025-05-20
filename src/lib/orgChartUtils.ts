@@ -6,20 +6,21 @@ import type { Employee, EmployeeNode } from '@/types/org-chart';
  * @param employees - A flat array of Employee objects.
  * @param supervisorId - The ID of the current supervisor to build the subtree for (null for root).
  * @param currentLevel - The current depth level in the tree for the nodes being generated.
+ * @param allEmployeesMap - A map of all employees (id -> Employee) for efficient lookup.
  * @returns An array of EmployeeNode objects representing the tree structure.
  */
 export function buildHierarchyTree(
   employees: Employee[],
   supervisorId: string | null = null,
-  currentLevel: number = 0
+  currentLevel: number = 0,
+  allEmployeesMap: Map<string, Employee> // Pass the full map for lookups
 ): EmployeeNode[] {
   const tree: EmployeeNode[] = [];
-  const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
 
   employees.forEach(employee => {
     if (employee.supervisorId === supervisorId) {
-      const supervisor = employee.supervisorId ? employeeMap.get(employee.supervisorId) : null;
-      const children = buildHierarchyTree(employees, employee.id, currentLevel + 1);
+      const supervisor = employee.supervisorId ? allEmployeesMap.get(employee.supervisorId) : null;
+      const children = buildHierarchyTree(employees, employee.id, currentLevel + 1, allEmployeesMap);
       
       let totalReportCount = children.length;
       children.forEach(child => {
@@ -29,6 +30,7 @@ export function buildHierarchyTree(
       tree.push({
         ...employee,
         supervisorName: supervisor ? supervisor.employeeName : undefined,
+        supervisorPositionNumber: supervisor ? supervisor.positionNumber : null, // Populate supervisorPositionNumber
         children: children,
         level: currentLevel,
         directReportCount: children.length,
@@ -53,7 +55,8 @@ export function convertToCSV(employees: Employee[]): string {
   }
   const headers: (keyof Employee)[] = [
     'id', 'employeeName', 'supervisorId', 'positionTitle', 'jobName', 
-    'grade', 'department', 'location', 'proformaCost', 'employeeCategory' // Added employeeCategory
+    'positionNumber', 'supervisorPositionNumber', // Added new fields
+    'grade', 'department', 'location', 'proformaCost', 'employeeCategory'
   ];
   
   const csvRows = [
@@ -82,7 +85,7 @@ export function parseCSV(csvString: string): Employee[] {
   const headers = headerString.split(',').map(h => h.trim()) as (keyof Employee)[];
   const dataRows = rows.slice(1);
 
-  return dataRows.map(rowString => {
+  const parsedEmployees = dataRows.map(rowString => {
     const values = [];
     let currentVal = '';
     let inQuotes = false;
@@ -108,13 +111,10 @@ export function parseCSV(csvString: string): Employee[] {
     headers.forEach((header, index) => {
       let value: string | number | null | undefined = values[index] ? values[index].trim() : '';
       
-      // Attempt to parse if it looks like a JSON stringified value (e.g., "some value", "null")
       if (typeof value === 'string' && value.startsWith('"') && value.endsWith('"')) {
         try {
          value = JSON.parse(value); 
         } catch {
-          // If JSON.parse fails, it's likely a string that happens to start/end with quotes.
-          // Remove the outer quotes.
           if (value.length >=2) value = value.substring(1, value.length -1);
         }
       }
@@ -123,25 +123,38 @@ export function parseCSV(csvString: string): Employee[] {
 
       if (cleanHeader === 'proformaCost') {
         employee[cleanHeader] = parseFloat(value as string) || 0;
-      } else if (cleanHeader === 'supervisorId') {
+      } else if (cleanHeader === 'supervisorId' || cleanHeader === 'supervisorPositionNumber') {
         employee[cleanHeader] = (value === 'null' || value === '' || value === null || value === undefined) ? null : String(value);
-      } else if (cleanHeader === 'id') {
+      } else if (cleanHeader === 'id' || cleanHeader === 'positionNumber') {
          employee[cleanHeader] = String(value);
       } else if (value === 'null' || value === undefined || value === '') {
-        employee[cleanHeader] = undefined; // Store actual undefined for optional fields
+        employee[cleanHeader] = undefined; 
       }
       else {
         employee[cleanHeader] = value as any;
       }
     });
-    // Ensure required fields have default values if not present or parsed incorrectly
+
     employee.id = String(employee.id || generateUniqueID());
+    employee.positionNumber = String(employee.positionNumber || `PN-${employee.id}`); // Default if missing
     employee.employeeName = String(employee.employeeName || 'Unknown Employee');
     employee.positionTitle = String(employee.positionTitle || 'Unknown Position');
     employee.jobName = String(employee.jobName || 'Unknown Job');
     employee.proformaCost = Number(employee.proformaCost || 0);
     
     return employee as Employee;
+  });
+
+  // Second pass to ensure supervisorPositionNumber is correctly set based on imported data
+  const employeeMap = new Map(parsedEmployees.map(emp => [emp.id, emp]));
+  return parsedEmployees.map(emp => {
+    if (emp.supervisorId && !emp.supervisorPositionNumber) {
+      const supervisor = employeeMap.get(emp.supervisorId);
+      if (supervisor) {
+        return { ...emp, supervisorPositionNumber: supervisor.positionNumber };
+      }
+    }
+    return emp;
   });
 }
 

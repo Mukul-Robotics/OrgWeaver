@@ -32,6 +32,8 @@ const employeeFormSchema = z.object({
   supervisorId: z.string().nullable().optional(),
   positionTitle: z.string().min(1, { message: "Position title is required." }),
   jobName: z.string().min(1, { message: "Job name is required." }),
+  positionNumber: z.string().min(1, {message: "Position number is required."}),
+  // supervisorPositionNumber is derived, not directly edited.
   grade: z.string().optional(),
   department: z.string().optional(),
   location: z.string().optional(),
@@ -42,7 +44,7 @@ const employeeFormSchema = z.object({
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
 
 interface AddEmployeeFormProps {
-  onSubmit: (employee: Employee) => void;
+  onSubmit: (employee: Omit<Employee, 'supervisorPositionNumber'>) => void; // onSubmit now expects data without supervisorPositionNumber
   existingEmployee?: Employee | null;
   allEmployees: Employee[]; // For supervisor selection
   onCancel?: () => void;
@@ -58,12 +60,14 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
           employeeCategory: existingEmployee.employeeCategory || "",
           grade: existingEmployee.grade || "",
           location: existingEmployee.location || "",
+          positionNumber: existingEmployee.positionNumber || "",
         }
       : {
         employeeName: '',
         supervisorId: null,
         positionTitle: '',
         jobName: '',
+        positionNumber: '',
         grade: '',
         department: '',
         location: '',
@@ -73,7 +77,9 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
   });
 
   const handleSubmit = (values: EmployeeFormData) => {
-    const employeeData: Employee = {
+    // supervisorPositionNumber is derived in the parent component (OrgWeaverPage)
+    // when the supervisorId changes or when an employee is added/updated.
+    const employeeData: Omit<Employee, 'supervisorPositionNumber'> = {
       ...values,
       id: existingEmployee?.id || values.id || generateUniqueID(),
       supervisorId: values.supervisorId || null,
@@ -81,6 +87,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
       employeeCategory: values.employeeCategory || undefined,
       grade: values.grade || undefined,
       location: values.location || undefined,
+      positionNumber: values.positionNumber,
     };
     onSubmit(employeeData);
     if (!existingEmployee) {
@@ -101,6 +108,19 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                   <FormLabel>Employee Name</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Jane Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="positionNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Position Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. POS123" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -137,7 +157,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               name="supervisorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Supervisor</FormLabel>
+                  <FormLabel>Supervisor (Employee ID)</FormLabel>
                   <FormControl>
                      <select
                         {...field}
@@ -150,7 +170,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
                           .filter(emp => emp.id !== existingEmployee?.id)
                           .map(emp => (
                           <option key={emp.id} value={emp.id}>
-                            {emp.employeeName} ({emp.id})
+                            {emp.employeeName} ({emp.id}) - Pos: {emp.positionNumber}
                           </option>
                         ))}
                       </select>
