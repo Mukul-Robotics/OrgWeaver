@@ -26,6 +26,8 @@ import {
 import { generateUniqueID } from '@/lib/orgChartUtils';
 import { PREDEFINED_GRADES, PREDEFINED_LOCATIONS, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
 
+// Sentinel value for "None (Optional)" category selection
+const NO_CATEGORY_SELECTED_VALUE = "__NO_CATEGORY_SENTINEL__";
 
 const employeeFormSchema = z.object({
   id: z.string().optional(),
@@ -38,7 +40,7 @@ const employeeFormSchema = z.object({
   department: z.string().optional(),
   location: z.string().min(1, { message: "Location is required." }),
   proformaCost: z.coerce.number().min(0, { message: "Proforma cost must be a positive number." }),
-  employeeCategory: z.string().optional(),
+  employeeCategory: z.string().optional(), // This will hold either a real category or the sentinel value
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -53,7 +55,7 @@ interface AddEmployeeFormProps {
 export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCancel }: AddEmployeeFormProps) {
   const defaultGrade = PREDEFINED_GRADES.length > 0 ? PREDEFINED_GRADES[0].value : "";
   const defaultLocation = PREDEFINED_LOCATIONS.length > 0 ? PREDEFINED_LOCATIONS[0].value : "";
-  const defaultCategory = EMPLOYEE_CATEGORIES.length > 0 ? EMPLOYEE_CATEGORIES[0].value : "";
+  // defaultCategory is removed as we will use NO_CATEGORY_SELECTED_VALUE for empty/new
 
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeFormSchema),
@@ -62,7 +64,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
           ...existingEmployee,
           employeeName: existingEmployee.employeeName || '',
           supervisorId: existingEmployee.supervisorId || null,
-          employeeCategory: existingEmployee.employeeCategory || defaultCategory,
+          employeeCategory: existingEmployee.employeeCategory || NO_CATEGORY_SELECTED_VALUE,
           grade: existingEmployee.grade || defaultGrade,
           location: existingEmployee.location || defaultLocation,
           positionNumber: existingEmployee.positionNumber || "",
@@ -77,7 +79,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         department: '',
         location: defaultLocation,
         proformaCost: 0,
-        employeeCategory: defaultCategory,
+        employeeCategory: NO_CATEGORY_SELECTED_VALUE, // Default to sentinel for new positions
       },
   });
 
@@ -88,9 +90,9 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
       employeeName: values.employeeName?.trim() ? values.employeeName.trim() : null,
       supervisorId: values.supervisorId || null,
       proformaCost: Number(values.proformaCost),
-      employeeCategory: values.employeeCategory || undefined, // Keep optional behavior
-      grade: values.grade, // Now required
-      location: values.location, // Now required
+      employeeCategory: values.employeeCategory === NO_CATEGORY_SELECTED_VALUE ? undefined : values.employeeCategory,
+      grade: values.grade, 
+      location: values.location, 
       positionNumber: values.positionNumber,
     };
     onSubmit(employeeData);
@@ -105,7 +107,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
         department: '',
         location: defaultLocation,
         proformaCost: 0,
-        employeeCategory: defaultCategory,
+        employeeCategory: NO_CATEGORY_SELECTED_VALUE,
       });
     }
   };
@@ -227,7 +229,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Grade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a grade" />
@@ -251,7 +253,7 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a location" />
@@ -275,14 +277,14 @@ export function AddEmployeeForm({ onSubmit, existingEmployee, allEmployees, onCa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Employee Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ""}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None (Optional)</SelectItem>
+                      <SelectItem value={NO_CATEGORY_SELECTED_VALUE}>None (Optional)</SelectItem>
                       {EMPLOYEE_CATEGORIES.map(category => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
