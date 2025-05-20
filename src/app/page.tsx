@@ -60,7 +60,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-// Step 1: Define the raw employee data without the derived supervisorPositionNumber
+// Step 1: Define the raw employee data without the derived supervisorPositionNumber, id, grade, location
 const rawInitialEmployees: Omit<Employee, 'supervisorPositionNumber' | 'id' | 'grade' | 'location'>[] = [
   { employeeName: 'Alice Wonderland', supervisorId: null, positionTitle: 'CEO', jobName: 'Chief Executive Officer', department: 'Executive', proformaCost: 300000, employeeCategory: 'Staff', positionNumber: 'POS001' },
   { employeeName: 'Bob The Builder', supervisorId: '1', positionTitle: 'CTO', jobName: 'Chief Technology Officer', department: 'Technology', proformaCost: 250000, employeeCategory: 'Staff', positionNumber: 'POS002' },
@@ -76,17 +76,23 @@ const rawInitialEmployees: Omit<Employee, 'supervisorPositionNumber' | 'id' | 'g
   { employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff', positionNumber: 'POS012' },
   { employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA', positionNumber: 'POS013' },
   { employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern', positionNumber: 'POS014' },
-  // Vacant Positions - ensuring they have grade and location
+  // Vacant Positions
   { employeeName: null, supervisorId: '4', positionTitle: 'Senior Product Manager', jobName: 'Senior PM', department: 'Technology', proformaCost: 160000, employeeCategory: 'N/A', positionNumber: 'POS015' },
   { employeeName: null, supervisorId: '12', positionTitle: 'Compensation Analyst', jobName: 'Comp Analyst', department: 'Human Resources', proformaCost: 85000, employeeCategory: 'N/A', positionNumber: 'POS016' },
+  // New Vacant Positions
+  { employeeName: null, supervisorId: '2', positionTitle: 'Vacant Technical Lead', jobName: 'Vacant Tech Lead', department: 'Technology', proformaCost: 170000, employeeCategory: 'N/A', positionNumber: 'POS017' },
+  { employeeName: null, supervisorId: '3', positionTitle: 'Vacant Project Manager', jobName: 'Vacant PM', department: 'Operations', proformaCost: 100000, employeeCategory: 'N/A', positionNumber: 'POS018' },
+  { employeeName: null, supervisorId: '4', positionTitle: 'Vacant QA Engineer', jobName: 'Vacant QA', department: 'Technology', proformaCost: 95000, employeeCategory: 'N/A', positionNumber: 'POS019' },
+  { employeeName: null, supervisorId: '12', positionTitle: 'Vacant HR Business Partner', jobName: 'Vacant HRBP', department: 'Human Resources', proformaCost: 110000, employeeCategory: 'N/A', positionNumber: 'POS020' },
+  { employeeName: null, supervisorId: '5', positionTitle: 'Vacant Junior Developer', jobName: 'Vacant Jr. Dev', department: 'Technology', proformaCost: 70000, employeeCategory: 'N/A', positionNumber: 'POS021' },
+  { employeeName: null, supervisorId: '7', positionTitle: 'Vacant Support Agent', jobName: 'Vacant Agent', department: 'Operations', proformaCost: 50000, employeeCategory: 'N/A', positionNumber: 'POS022' },
 ];
 
-// Assign unique IDs to raw employees and build a map for supervisor lookup
+// Assign unique IDs, grades, and locations to raw employees and build a map for supervisor lookup
 const rawEmployeesWithIdsAndRequiredFields: Omit<Employee, 'supervisorPositionNumber'>[] = rawInitialEmployees.map((emp, index) => {
-  const defaultGrade = PREDEFINED_GRADES[0]?.value || 'P1'; // Fallback if PREDEFINED_GRADES is empty
-  const defaultLocation = PREDEFINED_LOCATIONS[0]?.value || 'Remote'; // Fallback
+  const defaultGrade = PREDEFINED_GRADES[0]?.value || 'P1';
+  const defaultLocation = PREDEFINED_LOCATIONS[0]?.value || 'Remote';
 
-  // Assign grades and locations based on role or default
   let grade = defaultGrade;
   let location = defaultLocation;
 
@@ -104,12 +110,19 @@ const rawEmployeesWithIdsAndRequiredFields: Omit<Employee, 'supervisorPositionNu
   else if (emp.positionNumber === 'POS012') { grade = 'D1'; location = 'NewYork'; }
   else if (emp.positionNumber === 'POS013') { grade = 'G7'; location = 'NewYork'; }
   else if (emp.positionNumber === 'POS014') { grade = 'I1'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS015') { grade = 'P6'; location = 'SanFrancisco'; } // Vacant
-  else if (emp.positionNumber === 'POS016') { grade = 'P3'; location = 'NewYork'; } // Vacant
+  else if (emp.positionNumber === 'POS015') { grade = 'P6'; location = 'SanFrancisco'; } // Vacant Sr PM
+  else if (emp.positionNumber === 'POS016') { grade = 'P3'; location = 'NewYork'; } // Vacant Comp Analyst
+  // Grades and Locations for new vacant positions
+  else if (emp.positionNumber === 'POS017') { grade = 'P6'; location = 'Remote'; } // Vacant Tech Lead
+  else if (emp.positionNumber === 'POS018') { grade = 'P4'; location = 'NewYork'; } // Vacant PM
+  else if (emp.positionNumber === 'POS019') { grade = 'P3'; location = 'Remote'; } // Vacant QA
+  else if (emp.positionNumber === 'POS020') { grade = 'P4'; location = 'NewYork'; } // Vacant HRBP
+  else if (emp.positionNumber === 'POS021') { grade = 'P1'; location = 'Remote'; } // Vacant Jr. Dev
+  else if (emp.positionNumber === 'POS022') { grade = 'G4'; location = 'London'; } // Vacant Agent
   
   return {
     ...emp,
-    id: (index + 1).toString(),
+    id: (index + 1).toString(), // Assign sequential ID based on position in the array
     grade: grade,
     location: location,
   };
@@ -231,7 +244,7 @@ export default function OrgWeaverPage() {
       if(employeeExists){
         setViewStack([pendingDrillDownNodeId]);
       } else {
-         setViewStack([]); // Reset if pending node doesn't exist (e.g. deleted)
+         setViewStack([]); 
       }
       setPendingDrillDownNodeId(null);
     }
@@ -264,7 +277,6 @@ export default function OrgWeaverPage() {
           if (rootNodeFromSearch) {
             return [rootNodeFromSearch];
           } else {
-            // If currentSearchRootId is not found in the filtered tree (e.g. search refined), show top level of current filter
             return searchResultTree; 
           }
       }
@@ -275,7 +287,6 @@ export default function OrgWeaverPage() {
       } else {
         const rootEmployee = fullEmployeeMap.get(currentRootId);
         if (!rootEmployee) {
-          // Fallback if rootEmployee for drill-down not found (e.g., deleted or data issue)
           return buildHierarchyTree(employees, null, 0, fullEmployeeMap);
         }
 
@@ -328,7 +339,6 @@ export default function OrgWeaverPage() {
         ...newEmployeeData,
         employeeName: employeeName,
         supervisorPositionNumber: supervisor ? supervisor.positionNumber : null,
-        // Grade and Location are now required and should be coming from the form
         grade: newEmployeeData.grade, 
         location: newEmployeeData.location,
     };
@@ -359,7 +369,6 @@ export default function OrgWeaverPage() {
       ...updatedEmployeeData,
       employeeName: employeeName,
       supervisorPositionNumber: supervisor ? supervisor.positionNumber : null,
-      // Grade and Location are required
       grade: updatedEmployeeData.grade,
       location: updatedEmployeeData.location,
     };
@@ -404,15 +413,14 @@ export default function OrgWeaverPage() {
     const clickedEmployeeOriginal = fullEmployeeMap.get(nodeId);
     if (!clickedEmployeeOriginal) return;
 
-    // Check if the node has children in the original, unfiltered data
     const hasChildrenInOriginalData = employees.some(emp => emp.supervisorId === nodeId);
     
     const isCurrentRootOfDrillDown = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
 
     if (hasChildrenInOriginalData && !isCurrentRootOfDrillDown) {
         if (isCurrentlySearching) {
-            setPendingDrillDownNodeId(nodeId); // Set the ID to drill to after search is cleared
-            setSearchTerm(''); // Clear search, which will trigger the useEffect
+            setPendingDrillDownNodeId(nodeId); 
+            setSearchTerm(''); 
         } else {
             setViewStack(prevStack => [...prevStack, nodeId]);
         }
@@ -428,7 +436,6 @@ export default function OrgWeaverPage() {
 
   const handleGoUp = () => {
     if (isCurrentlySearching && viewStack.length === 0) {
-        // If searching and at the top level of search results, clearing search term goes "up" to full chart
         setSearchTerm('');
         return;
     }
@@ -738,3 +745,6 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+
+
+    
