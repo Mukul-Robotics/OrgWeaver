@@ -28,15 +28,16 @@ import { ExportDataModal } from '@/components/modals/ExportDataModal';
 import { AiRecommendationsModal } from '@/components/modals/AiRecommendationsModal';
 import { ReorganizationSummaryModal } from '@/components/modals/ReorganizationSummaryModal';
 import { EditEmployeeModal } from '@/components/modals/EditEmployeeModal';
+import { SubmitApprovalModal } from '@/components/modals/SubmitApprovalModal'; // New Modal
 import { LogoIcon } from '@/components/icons/LogoIcon';
 
 import type { Employee, EmployeeNode, DisplayAttributeKey, PageSize, AiRecommendationsData, ReorganizationSummaryData } from '@/types/org-chart';
-import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE, EMPLOYEE_CATEGORIES } from '@/types/org-chart';
+import { DEFAULT_DISPLAY_ATTRIBUTES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/types/org-chart';
 import { buildHierarchyTree, calculateTotalProformaCost, generateUniqueID } from '@/lib/orgChartUtils';
 import { summarizeReorganizationImpact } from '@/ai/flows/summarize-reorganization-impact';
 import { recommendHierarchyOptimizations } from '@/ai/flows/recommend-hierarchy-optimizations';
 import { useToast } from '@/hooks/use-toast';
-import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon } from 'lucide-react';
+import { Import, FileOutput, Users, Brain, Sparkles, UserPlus, Edit3, Save, Trash2, ArrowRightLeft, Printer, ArrowUpFromLine, Tag, SearchIcon, Send } from 'lucide-react'; // Added Send icon
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -74,7 +75,7 @@ const initialSampleEmployees: Employee[] = [
   { id: '10', employeeName: 'Jack Consultant', supervisorId: '2', positionTitle: 'Cloud Architect', jobName: 'Consultant Arch.', department: 'Technology', proformaCost: 180000, employeeCategory: 'IndividualConsultant' },
   { id: '11', employeeName: 'Olivia Operator', supervisorId: '3', positionTitle: 'Operations Analyst', jobName: 'Ops Analyst', department: 'Operations', proformaCost: 80000, employeeCategory: 'Staff' },
   { id: '12', employeeName: 'Henry Human', supervisorId: '1', positionTitle: 'VP Human Resources', jobName: 'VP HR', department: 'Human Resources', proformaCost: 190000, employeeCategory: 'Staff' },
-  { id: '13', employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'Staff' },
+  { id: '13', employeeName: 'Rachel Recruiter', supervisorId: '12', positionTitle: 'HR Specialist', jobName: 'HR Spec.', department: 'Human Resources', proformaCost: 75000, employeeCategory: 'PSA' },
   { id: '14', employeeName: 'Kevin Kandidate', supervisorId: '13', positionTitle: 'HR Intern', jobName: 'Intern HR', department: 'Human Resources', proformaCost: 35000, employeeCategory: 'Intern' },
 ];
 
@@ -130,6 +131,7 @@ export default function OrgWeaverPage() {
   const [isAiModalOpen, setAiModalOpen] = useState(false);
   const [isSummaryModalOpen, setSummaryModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
+  const [isSubmitApprovalModalOpen, setSubmitApprovalModalOpen] = useState(false); // New state for approval modal
 
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendationsData | null>(null);
   const [reorgSummary, setReorgSummary] = useState<ReorganizationSummaryData | null>(null);
@@ -168,18 +170,19 @@ export default function OrgWeaverPage() {
     );
   }, [employees, searchTerm]);
 
-  useEffect(() => {
+ useEffect(() => {
     const newIsSearching = searchTerm.trim() !== '';
     if (newIsSearching !== isCurrentlySearching) {
       setViewStack([]); 
-      setSelectedNodeId(null); 
+      setSelectedNodeId(null);
       setIsCurrentlySearching(newIsSearching); 
     }
+    
     if (!newIsSearching && pendingDrillDownNodeId) {
       setViewStack([pendingDrillDownNodeId]);
       setPendingDrillDownNodeId(null);
     }
-  }, [searchTerm, isCurrentlySearching, pendingDrillDownNodeId, setViewStack, setSelectedNodeId, setIsCurrentlySearching, setPendingDrillDownNodeId]);
+  }, [searchTerm, isCurrentlySearching, pendingDrillDownNodeId]);
 
 
   const currentViewNodes = useMemo(() => {
@@ -192,8 +195,8 @@ export default function OrgWeaverPage() {
         return searchResultTree;
       } else {
         let rootNodeFromSearch: EmployeeNode | null = null;
-        const findNodeInTreeRecursive = (nodes: EmployeeNode[], id: string): EmployeeNode | null => {
-          for (const node of nodes) {
+        const findNodeInTreeRecursive = (nodesToSearch: EmployeeNode[], id: string): EmployeeNode | null => {
+          for (const node of nodesToSearch) {
             if (node.id === id) return node;
             if (node.children) {
               const found = findNodeInTreeRecursive(node.children, id);
@@ -315,7 +318,6 @@ export default function OrgWeaverPage() {
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedNodeId(nodeId);
-
     const clickedEmployeeOriginal = fullEmployeeMap.get(nodeId);
     if (!clickedEmployeeOriginal) {
         console.warn(`Clicked node ${nodeId} not found in fullEmployeeMap.`);
@@ -430,6 +432,14 @@ export default function OrgWeaverPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleSubmitForApproval = () => {
+    if (employees.length === 0) {
+        toast({ title: 'No Data', description: 'Cannot submit an empty organization for approval.', variant: 'destructive' });
+        return;
+    }
+    setSubmitApprovalModalOpen(true);
   };
   
   const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
@@ -550,6 +560,11 @@ export default function OrgWeaverPage() {
                           </AlertDialog>
                         </SidebarMenuItem>
                       )}
+                       <SidebarMenuItem>
+                        <Button variant="outline" className="w-full justify-start text-primary hover:text-primary hover:bg-primary/10 border-primary/50" onClick={handleSubmitForApproval}>
+                          <Send className="mr-2" /> Submit for Approval
+                        </Button>
+                      </SidebarMenuItem>
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
@@ -649,9 +664,16 @@ export default function OrgWeaverPage() {
           onUpdateEmployee={handleUpdateEmployee}
         />
       )}
+      <SubmitApprovalModal
+        isOpen={isSubmitApprovalModalOpen}
+        onClose={() => setSubmitApprovalModalOpen(false)}
+        onSubmit={() => {
+            // In a real app, this would call a backend API
+            toast({ title: 'Submission Sent (Placeholder)', description: 'Your organization chart has been submitted for approval.'});
+            setSubmitApprovalModalOpen(false);
+        }}
+      />
     </SidebarProvider>
   );
 }
-    
-
     
