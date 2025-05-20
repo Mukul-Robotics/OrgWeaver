@@ -2,7 +2,7 @@
 import type { EmployeeNode, DisplayAttributeKey } from '@/types/org-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Briefcase, MapPin, DollarSign, Hash, UserCheck, ShieldAlert, Building, Edit3, Users2, Tag, SquareAsterisk, ChevronsUpDownIcon, UserX } from 'lucide-react'; // Added UserX for vacant
+import { Users, Briefcase, MapPin, DollarSign, Hash, UserCheck, ShieldAlert, Building, Edit3, Users2, Tag, SquareAsterisk, ChevronsUpDownIcon, UserX } from 'lucide-react';
 import { ALL_DISPLAY_ATTRIBUTES } from '@/types/org-chart';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +13,7 @@ interface OrgChartNodeCardProps {
   onEditClick?: (nodeId: string) => void;
   isSelected?: boolean;
   className?: string;
-  hasChildren?: boolean; // Propagated from HierarchyVisualizer
+  hasChildren?: boolean;
 }
 
 const attributeIcons: Partial<Record<DisplayAttributeKey, React.ElementType>> = {
@@ -39,7 +39,7 @@ const categoryBorderColors: Record<string, string> = {
   'Intern': 'border-pink-500',
   'IndividualConsultant': 'border-cyan-500',
   'Fellow': 'border-indigo-500',
-  'N/A': 'border-dashed border-muted-foreground', // For vacant positions
+  'N/A': 'border-dashed border-muted-foreground',
 };
 
 export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEditClick, isSelected, className }: OrgChartNodeCardProps) {
@@ -53,12 +53,11 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
 
 
   const getDisplayValue = (attrKey: DisplayAttributeKey): string | number | null | undefined => {
-    if (attrKey === 'employeeNumber') return node.id;
+    if (attrKey === 'employeeNumber' && node.id === node[attrKey as keyof EmployeeNode] && !selectedAttributes.includes('employeeNumber')) return undefined; // Don't show if not explicitly selected
     if (attrKey === 'supervisorId' && selectedAttributes.includes('supervisorName') && node.supervisorName) return undefined;
     if (attrKey === 'supervisorId' && !node.supervisorId) return undefined;
     if (attrKey === 'supervisorPositionNumber' && !node.supervisorPositionNumber) return undefined;
     
-    // Don't show employeeName attribute if the position is vacant, as it's already handled by displayName
     if (attrKey === 'employeeName' && isVacant) return undefined;
 
     return node[attrKey as keyof EmployeeNode];
@@ -69,7 +68,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
   return (
     <Card
       className={cn(
-        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full flex flex-col h-[160px]`,
+        `shadow-sm hover:shadow-lg transition-shadow duration-200 w-full`, // Removed h-[160px]
         onSelectNode ? 'cursor-pointer' : '',
         isSelected ? 'ring-2 ring-primary' : '',
         categoryBorderClass,
@@ -104,12 +103,12 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
         </div>
         <CardDescription className="text-xs truncate" title={`${node.positionTitle} (${node.positionNumber})`}>{node.positionTitle} ({node.positionNumber})</CardDescription>
       </CardHeader>
-      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5 flex-1 overflow-y-auto flex flex-col">
-        <div className="flex-grow">
+      <CardContent className="p-1.5 pt-0.5 text-xs space-y-0.5"> {/* Removed flex-1 overflow-y-auto flex flex-col */}
+        <div> {/* Replaced flex-grow div */}
           {selectedAttributes.map((attrKey) => {
             const value = getDisplayValue(attrKey);
             if (value === undefined || value === null || value === '') return null;
-            if (attrKey === 'employeeName' || attrKey === 'positionTitle' || attrKey === 'positionNumber') return null;
+            if (attrKey === 'employeeName' || attrKey === 'positionTitle' || attrKey === 'positionNumber') return null; // Already displayed in header/description
             if (attrKey === 'employeeNumber' && node.id === value && !selectedAttributes.includes('employeeNumber')) return null;
 
             const Icon = attributeIcons[attrKey];
@@ -130,7 +129,7 @@ export function OrgChartNodeCard({ node, selectedAttributes, onSelectNode, onEdi
           )}
         </div>
         {hasReports && (
-          <div className="mt-auto pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1">
+          <div className="pt-1 text-right text-xs text-muted-foreground flex items-center justify-end space-x-1"> {/* Removed mt-auto */}
             <Users2 className="h-3 w-3" />
             <span title="Direct Reports">D:{node.directReportCount ?? 0}</span>
             <span>/</span>
