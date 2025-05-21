@@ -96,6 +96,7 @@ const rawEmployeesWithIdsAndRequiredFields: Omit<Employee, 'supervisorPositionNu
   let grade = defaultGrade;
   let location = defaultLocation;
 
+  // Explicit Grade and Location assignments
   if (emp.positionNumber === 'POS001') { grade = 'SG'; location = 'NewYork'; }
   else if (emp.positionNumber === 'POS002') { grade = 'ASG'; location = 'SanFrancisco'; }
   else if (emp.positionNumber === 'POS003') { grade = 'ASG'; location = 'NewYork'; }
@@ -204,6 +205,7 @@ export default function OrgWeaverPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCurrentlySearching, setIsCurrentlySearching] = useState(false);
   const [pendingDrillDownNodeId, setPendingDrillDownNodeId] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
 
   const { toast } = useToast();
@@ -235,32 +237,33 @@ export default function OrgWeaverPage() {
  useEffect(() => {
     const newIsSearching = searchTerm.trim() !== '';
     if (newIsSearching !== isCurrentlySearching) {
-      setViewStack([]); 
-      setIsCurrentlySearching(newIsSearching);
+        setViewStack([]); // Reset drill-down when search status flips
+        setIsCurrentlySearching(newIsSearching);
     }
 
-    if (!newIsSearching && pendingDrillDownNodeId) {
-      const employeeExists = fullEmployeeMap.has(pendingDrillDownNodeId);
-      if(employeeExists){
-        setViewStack([pendingDrillDownNodeId]);
-      } else {
-         setViewStack([]); 
-      }
-      setPendingDrillDownNodeId(null);
+    if (!newIsSearching && pendingDrillDownNodeId) { // If search was just cleared and we have a pending drill-down
+        const employeeExists = fullEmployeeMap.has(pendingDrillDownNodeId);
+        if (employeeExists) {
+            setViewStack([pendingDrillDownNodeId]);
+        } else {
+            setViewStack([]); // Fallback if pending node doesn't exist
+        }
+        setPendingDrillDownNodeId(null);
     }
   }, [searchTerm, isCurrentlySearching, pendingDrillDownNodeId, fullEmployeeMap]);
 
 
   const currentViewNodes = useMemo(() => {
+    const currentRootIdFromStack = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+
     if (isCurrentlySearching) {
       if (!filteredEmployeeIdsForSearch || filteredEmployeeIdsForSearch.size === 0) return [];
       
-      let searchResultTree = buildFilteredTreeForSearch(employees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
-      const currentSearchRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+      let searchResultTreeRoots = buildFilteredTreeForSearch(employees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
 
-      if (!currentSearchRootId) {
-        return searchResultTree;
-      } else {
+      if (!currentRootIdFromStack) { // No drill-down within search results
+        return searchResultTreeRoots;
+      } else { // Drilled down within search results
           let rootNodeFromSearch: EmployeeNode | null = null;
           const findNodeInTreeRecursive = (nodesToSearch: EmployeeNode[], id: string): EmployeeNode | null => {
             for (const node of nodesToSearch) {
@@ -272,47 +275,64 @@ export default function OrgWeaverPage() {
             }
             return null;
           };
-          rootNodeFromSearch = findNodeInTreeRecursive(searchResultTree, currentSearchRootId);
-          
-          if (rootNodeFromSearch) {
-            return [rootNodeFromSearch];
-          } else {
-            return searchResultTree; 
-          }
-      }
-    } else { 
-      const currentRootId = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
-      if (!currentRootId) {
-        return buildHierarchyTree(employees, null, 0, fullEmployeeMap);
-      } else {
-        const rootEmployee = fullEmployeeMap.get(currentRootId);
-        if (!rootEmployee) {
-          return buildHierarchyTree(employees, null, 0, fullEmployeeMap);
-        }
-
-        let originalLevel = 0;
-        let tempSupervisorId = rootEmployee.supervisorId;
-        while(tempSupervisorId) {
-          originalLevel++;
-          const supervisor = fullEmployeeMap.get(tempSupervisorId);
-          tempSupervisorId = supervisor ? supervisor.supervisorId : null;
-        }
-        
-        const children = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
-        const supervisor = rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId) : null;
-        
-        return [{
-          ...rootEmployee,
-          supervisorName: supervisor?.employeeName,
-          supervisorPositionNumber: supervisor?.positionNumber,
-          children: children,
-          level: originalLevel,
-          directReportCount: children.length,
-          totalReportCount: children.reduce((acc, child) => acc + (child.totalReportCount || 0), children.length),
-        }];
+          rootNodeFromSearch = findNodeInTreeRecursive(searchResultTreeRoots, currentRootIdFromStack);
+          return rootNodeFromSearch ? [rootNodeFromSearch] : searchResultTreeRoots; 
       }
     }
-  }, [employees, searchTerm, viewStack, filteredEmployeeIdsForSearch, isCurrentlySearching, fullEmployeeMap]);
+    
+    // Not searching: Normal view or Print view
+    if (!currentRootIdFromStack) { // Top level (e.g., Alice)
+      const topLevelNodes = buildHierarchyTree(employees, null, 0, fullEmployeeMap);
+      if (isPrinting) {
+        return topLevelNodes; // Print full hierarchy from all top-level nodes
+      }
+      // Normal view: Prune grandchildren of top-level nodes
+      return topLevelNodes.map(node => ({
+        ...node,
+        children: node.children.map(directChild => ({ ...directChild, children: [] }))
+      }));
+    } else { // Drilled-down view (e.g., viewing Bob's team)
+      const rootEmployee = fullEmployeeMap.get(currentRootIdFromStack);
+      if (!rootEmployee) return []; 
+
+      // Calculate original level for the root of the current view
+      let originalLevel = 0;
+      let tempSupervisorId = rootEmployee.supervisorId;
+      while(tempSupervisorId) {
+        originalLevel++;
+        const supervisor = fullEmployeeMap.get(tempSupervisorId);
+        tempSupervisorId = supervisor ? supervisor.supervisorId : null;
+      }
+      
+      // Build the full subtree for this root employee
+      const fullSubTreeForRoot = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
+      
+      const rootNodeWithFullChildren: EmployeeNode = {
+        ...rootEmployee,
+        supervisorName: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.employeeName : undefined,
+        supervisorPositionNumber: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.positionNumber : null,
+        children: fullSubTreeForRoot,
+        level: originalLevel,
+        directReportCount: fullSubTreeForRoot.length, // direct reports of the rootEmployee
+        totalReportCount: fullSubTreeForRoot.reduce((acc, child) => acc + (child.totalReportCount || 0), fullSubTreeForRoot.length),
+      };
+
+      if (isPrinting) {
+        return [rootNodeWithFullChildren]; // Print full hierarchy from this drilled-down node
+      }
+
+      // Normal view: Prune grandchildren (children of rootNodeWithFullChildren's children)
+      const directChildrenOfRootPruned = rootNodeWithFullChildren.children.map(directChild => ({
+        ...directChild,
+        children: [] 
+      }));
+      
+      return [{
+        ...rootNodeWithFullChildren,
+        children: directChildrenOfRootPruned,
+      }];
+    }
+  }, [employees, searchTerm, viewStack, filteredEmployeeIdsForSearch, isCurrentlySearching, fullEmployeeMap, isPrinting]);
 
 
   const currentEditingEmployee = useMemo(() => {
@@ -408,20 +428,22 @@ export default function OrgWeaverPage() {
     triggerReorganizationSummary(originalEmployeesForSummary || [], updatedEmployees);
   };
 
- const handleNodeClick = (nodeId: string) => {
-    setSelectedNodeId(nodeId);
+  const handleNodeClick = (nodeId: string) => {
+    setSelectedNodeId(nodeId); // Select node regardless of drill-down
     const clickedEmployeeOriginal = fullEmployeeMap.get(nodeId);
     if (!clickedEmployeeOriginal) return;
 
+    // Check if the employee has children in the *original complete dataset*
     const hasChildrenInOriginalData = employees.some(emp => emp.supervisorId === nodeId);
-    
     const isCurrentRootOfDrillDown = viewStack.length > 0 && viewStack[viewStack.length - 1] === nodeId;
 
     if (hasChildrenInOriginalData && !isCurrentRootOfDrillDown) {
         if (isCurrentlySearching) {
-            setPendingDrillDownNodeId(nodeId); 
-            setSearchTerm(''); 
+            // If searching, set pending and clear search to transition to normal drill-down view
+            setPendingDrillDownNodeId(nodeId);
+            setSearchTerm(''); // This will trigger useEffect to handle the transition
         } else {
+            // Not searching, normal drill-down
             setViewStack(prevStack => [...prevStack, nodeId]);
         }
     }
@@ -436,10 +458,11 @@ export default function OrgWeaverPage() {
 
   const handleGoUp = () => {
     if (isCurrentlySearching && viewStack.length === 0) {
-        setSearchTerm('');
+        // If at the top level of search results, clearing search term goes to full top level.
+        setSearchTerm(''); 
         return;
     }
-
+    // Otherwise, just pop from viewStack (works for both normal and search drill-down)
     const newStack = viewStack.slice(0, -1);
     setViewStack(newStack);
     setSelectedNodeId(newStack.length > 0 ? newStack[newStack.length - 1] : null);
@@ -513,19 +536,28 @@ export default function OrgWeaverPage() {
   };
 
   const handlePrintChart = () => {
-    try {
-      window.print();
-    } catch (error) {
-      console.error("Print error:", error);
-      toast({
-        title: "Print Error",
-        description: `Could not open print dialog. ${error instanceof Error ? error.message : 'Unknown error.'} This may be due to browser restrictions in this environment.`,
-        variant: "destructive",
-      });
-    }
+    setIsPrinting(true);
+    requestAnimationFrame(() => {
+      try {
+        window.print();
+      } catch (error) {
+          console.error("Print error:", error);
+          toast({
+            title: "Print Error",
+            description: `Could not open print dialog. ${error instanceof Error ? error.message : 'Unknown error.'} This may be due to browser restrictions.`,
+            variant: "destructive",
+          });
+      } finally {
+        // Use another rAF to ensure the print dialog has had a chance to close
+        // or at least the blocking operation is done.
+        requestAnimationFrame(() => {
+            setIsPrinting(false);
+        });
+      }
+    });
   };
 
-  const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0);
+  const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0 && searchTerm.length > 0);
 
 
   return (
@@ -745,6 +777,3 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
-
-
-    
