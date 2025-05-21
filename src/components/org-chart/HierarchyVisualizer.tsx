@@ -11,6 +11,7 @@ interface HierarchyVisualizerProps {
   onEditClick?: (nodeId: string) => void;
   selectedNodeId?: string | null;
   pageSize: PageSize;
+  isPrinting?: boolean;
 }
 
 // Approximate pixel dimensions at 96 DPI
@@ -19,50 +20,50 @@ const PAGE_DIMENSIONS: Record<Exclude<PageSize, 'fitToScreen'>, { width: string;
   a4Landscape: { width: '1123px', height: '794px' },
   letterPortrait: { width: '816px', height: '1056px' },
   letterLandscape: { width: '1056px', height: '816px' },
-  a5Portrait: { width: '559px', height: '794px' }, // 148mm x 210mm
-  a5Landscape: { width: '794px', height: '559px' }, // 210mm x 148mm
+  a5Portrait: { width: '559px', height: '794px' },
+  a5Landscape: { width: '794px', height: '559px' },
 };
 
-// Renders a single node and its direct children's cards
+// Renders a single node and its children's cards
 const renderEmployeeSegment = (
   node: EmployeeNode,
   selectedAttributes: DisplayAttributeKey[],
   onSelectNode?: (nodeId: string) => void,
   onEditClick?: (nodeId: string) => void,
   selectedNodeId?: string | null,
-  isRootNodeInView: boolean = false // Added to differentiate the top-level node in the current view
+  isRootNodeInView: boolean = false,
+  currentLevel: number = 0
 ): JSX.Element => {
   return (
-    <div key={node.id} className={cn("w-full", isRootNodeInView ? "mb-6" : "p-1")}>
+    <div key={node.id} className={cn("w-full org-chart-segment", isRootNodeInView ? "mb-4" : "pt-2")}>
       <OrgChartNodeCard
         node={node}
         selectedAttributes={selectedAttributes}
         onSelectNode={onSelectNode}
         onEditClick={onEditClick}
         isSelected={selectedNodeId === node.id}
-        // hasChildren is implicitly handled by node.directReportCount in OrgChartNodeCard
       />
       {node.children && node.children.length > 0 && (
-        <div className={cn(
-          "mt-2 grid gap-2",
-          // Responsive columns:
-          // Default to 2 columns on smallest screens (mobile-first)
-          "grid-cols-2",
-          // 3 columns on small screens (640px+)
-          "sm:grid-cols-3",
-          // 4 columns on medium screens (768px+), covers A4/A5 Portrait
-          "md:grid-cols-4",
-        )}>
-          {node.children.map(childNode => (
-            <OrgChartNodeCard
-              key={childNode.id}
-              node={childNode}
-              selectedAttributes={selectedAttributes}
-              onSelectNode={onSelectNode}
-              onEditClick={onEditClick}
-              isSelected={selectedNodeId === childNode.id}
-            />
-          ))}
+        <div className="ml-4 pl-3 pt-2"> {/* Basic nesting indentation */}
+          <div className={cn(
+            "grid gap-2",
+            // Responsive columns:
+            "grid-cols-2", // Default: 2 columns for smallest screens
+            "sm:grid-cols-3", // Small screens (640px+): 3 columns
+            "md:grid-cols-4", // Medium screens (768px+): 4 columns (target for A4 portrait)
+          )}>
+            {node.children.map(childNode => (
+               renderEmployeeSegment(
+                 childNode,
+                 selectedAttributes,
+                 onSelectNode,
+                 onEditClick,
+                 selectedNodeId,
+                 false,
+                 currentLevel +1
+                )
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -77,14 +78,15 @@ export function HierarchyVisualizer({
   onEditClick,
   selectedNodeId,
   pageSize,
+  isPrinting = false,
 }: HierarchyVisualizerProps) {
 
   const visualizerStyle = React.useMemo(() => {
-    if (pageSize === 'fitToScreen') {
-      return { width: '100%', height: '100%' }; // Or minHeight for better UX
+    if (isPrinting || pageSize === 'fitToScreen') {
+      return { width: '100%', minHeight: '100%' }; // For printing, allow natural flow; for fitToScreen, take available space
     }
-    return PAGE_DIMENSIONS[pageSize] || { width: '100%', height: '100%' };
-  }, [pageSize]);
+    return PAGE_DIMENSIONS[pageSize] || { width: '100%', minHeight: '100%' };
+  }, [pageSize, isPrinting]);
 
 
   if (!nodes || nodes.length === 0) {
@@ -101,13 +103,15 @@ export function HierarchyVisualizer({
     <div
       style={visualizerStyle}
       className={cn(
-        "p-1 md:p-2 overflow-auto bg-background mx-auto", // Added mx-auto to center fixed-size pages
-        pageSize === 'fitToScreen' ? 'h-full w-full' : 'shadow-lg border my-4' // Add styling for page-like appearance
+        "bg-background",
+        isPrinting ? "p-0 m-0" : "p-1 md:p-2 mx-auto", // No padding/margin for print, let print.css handle
+        (pageSize === 'fitToScreen' && !isPrinting) ? 'h-full w-full overflow-auto' : '', 
+        (pageSize !== 'fitToScreen' && !isPrinting) ? 'shadow-lg border my-4 overflow-auto' : ''
+        // When printing, overflow is handled by print.css to be 'visible'
       )}
-      id="hierarchy-visualizer-container" // Added id for potential print styling
+      id="hierarchy-visualizer-container"
     >
-      {/* Render each node in the 'nodes' array as a top-level segment in the current view */}
-      {nodes.map(node => renderEmployeeSegment(node, selectedAttributes, onSelectNode, onEditClick, selectedNodeId, true))}
+      {nodes.map(node => renderEmployeeSegment(node, selectedAttributes, onSelectNode, onEditClick, selectedNodeId, true, 0))}
     </div>
   );
 }

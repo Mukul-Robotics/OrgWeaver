@@ -97,20 +97,20 @@ const rawEmployeesWithIdsAndRequiredFields: Omit<Employee, 'supervisorPositionNu
   let location = defaultLocation;
 
   // Explicit Grade and Location assignments
-  if (emp.positionNumber === 'POS001') { grade = 'SG'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS002') { grade = 'ASG'; location = 'SanFrancisco'; }
-  else if (emp.positionNumber === 'POS003') { grade = 'ASG'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS004') { grade = 'D2'; location = 'Remote'; }
-  else if (emp.positionNumber === 'POS005') { grade = 'P7'; location = 'Remote'; }
-  else if (emp.positionNumber === 'POS006') { grade = 'P6'; location = 'Remote'; }
-  else if (emp.positionNumber === 'POS007') { grade = 'P4'; location = 'London'; }
-  else if (emp.positionNumber === 'POS008') { grade = 'G6'; location = 'London'; }
-  else if (emp.positionNumber === 'POS009') { grade = 'I2'; location = 'Remote'; }
-  else if (emp.positionNumber === 'POS010') { grade = 'P5'; location = 'Remote'; }
-  else if (emp.positionNumber === 'POS011') { grade = 'P3'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS012') { grade = 'D1'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS013') { grade = 'G7'; location = 'NewYork'; }
-  else if (emp.positionNumber === 'POS014') { grade = 'I1'; location = 'NewYork'; }
+  if (emp.positionNumber === 'POS001') { grade = 'SG'; location = 'NewYork'; } // Alice
+  else if (emp.positionNumber === 'POS002') { grade = 'ASG'; location = 'SanFrancisco'; } // Bob
+  else if (emp.positionNumber === 'POS003') { grade = 'ASG'; location = 'NewYork'; } // Charlie
+  else if (emp.positionNumber === 'POS004') { grade = 'D2'; location = 'Remote'; } // Diana
+  else if (emp.positionNumber === 'POS005') { grade = 'P7'; location = 'Remote'; } // Edward
+  else if (emp.positionNumber === 'POS006') { grade = 'P6'; location = 'Remote'; } // Fiona
+  else if (emp.positionNumber === 'POS007') { grade = 'P4'; location = 'London'; } // Gary
+  else if (emp.positionNumber === 'POS008') { grade = 'G6'; location = 'London'; } // Helen
+  else if (emp.positionNumber === 'POS009') { grade = 'I2'; location = 'Remote'; } // Ian
+  else if (emp.positionNumber === 'POS010') { grade = 'P5'; location = 'Remote'; } // Jack
+  else if (emp.positionNumber === 'POS011') { grade = 'P3'; location = 'NewYork'; } // Olivia
+  else if (emp.positionNumber === 'POS012') { grade = 'D1'; location = 'NewYork'; } // Henry
+  else if (emp.positionNumber === 'POS013') { grade = 'G7'; location = 'NewYork'; } // Rachel
+  else if (emp.positionNumber === 'POS014') { grade = 'I1'; location = 'NewYork'; } // Kevin
   else if (emp.positionNumber === 'POS015') { grade = 'P6'; location = 'SanFrancisco'; } // Vacant Sr PM
   else if (emp.positionNumber === 'POS016') { grade = 'P3'; location = 'NewYork'; } // Vacant Comp Analyst
   // Grades and Locations for new vacant positions
@@ -255,11 +255,12 @@ export default function OrgWeaverPage() {
 
   const currentViewNodes = useMemo(() => {
     const currentRootIdFromStack = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
+    const sourceEmployees = employees; // Use the full list of employees as the source
 
     if (isCurrentlySearching) {
       if (!filteredEmployeeIdsForSearch || filteredEmployeeIdsForSearch.size === 0) return [];
       
-      let searchResultTreeRoots = buildFilteredTreeForSearch(employees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
+      let searchResultTreeRoots = buildFilteredTreeForSearch(sourceEmployees, filteredEmployeeIdsForSearch, null, 0, fullEmployeeMap);
 
       if (!currentRootIdFromStack) { // No drill-down within search results
         return searchResultTreeRoots;
@@ -282,7 +283,7 @@ export default function OrgWeaverPage() {
     
     // Not searching: Normal view or Print view
     if (!currentRootIdFromStack) { // Top level (e.g., Alice)
-      const topLevelNodes = buildHierarchyTree(employees, null, 0, fullEmployeeMap);
+      const topLevelNodes = buildHierarchyTree(sourceEmployees, null, 0, fullEmployeeMap);
       if (isPrinting) {
         return topLevelNodes; // Print full hierarchy from all top-level nodes
       }
@@ -295,7 +296,6 @@ export default function OrgWeaverPage() {
       const rootEmployee = fullEmployeeMap.get(currentRootIdFromStack);
       if (!rootEmployee) return []; 
 
-      // Calculate original level for the root of the current view
       let originalLevel = 0;
       let tempSupervisorId = rootEmployee.supervisorId;
       while(tempSupervisorId) {
@@ -304,33 +304,33 @@ export default function OrgWeaverPage() {
         tempSupervisorId = supervisor ? supervisor.supervisorId : null;
       }
       
-      // Build the full subtree for this root employee
-      const fullSubTreeForRoot = buildHierarchyTree(employees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
-      
-      const rootNodeWithFullChildren: EmployeeNode = {
+      if (isPrinting) {
+        // Build the full subtree for this root employee for printing
+        const fullSubTreeForRoot = buildHierarchyTree(sourceEmployees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
+        const rootNodeWithFullChildren: EmployeeNode = {
+          ...rootEmployee,
+          supervisorName: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.employeeName : undefined,
+          supervisorPositionNumber: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.positionNumber : null,
+          children: fullSubTreeForRoot, // Attach full children tree
+          level: originalLevel,
+          directReportCount: fullSubTreeForRoot.length,
+          totalReportCount: fullSubTreeForRoot.reduce((acc, child) => acc + (child.totalReportCount || 0), fullSubTreeForRoot.length),
+        };
+        return [rootNodeWithFullChildren];
+      }
+
+      // Normal view: Build subtree but prune its grandchildren
+      const directChildrenSubTree = buildHierarchyTree(sourceEmployees, rootEmployee.id, originalLevel + 1, fullEmployeeMap);
+      const rootNodeWithPrunedChildren: EmployeeNode = {
         ...rootEmployee,
         supervisorName: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.employeeName : undefined,
         supervisorPositionNumber: rootEmployee.supervisorId ? fullEmployeeMap.get(rootEmployee.supervisorId)?.positionNumber : null,
-        children: fullSubTreeForRoot,
+        children: directChildrenSubTree.map(directChild => ({ ...directChild, children: [] })), // Prune here
         level: originalLevel,
-        directReportCount: fullSubTreeForRoot.length, // direct reports of the rootEmployee
-        totalReportCount: fullSubTreeForRoot.reduce((acc, child) => acc + (child.totalReportCount || 0), fullSubTreeForRoot.length),
+        directReportCount: directChildrenSubTree.length,
+        totalReportCount: directChildrenSubTree.reduce((acc, child) => acc + (child.totalReportCount || 0), directChildrenSubTree.length),
       };
-
-      if (isPrinting) {
-        return [rootNodeWithFullChildren]; // Print full hierarchy from this drilled-down node
-      }
-
-      // Normal view: Prune grandchildren (children of rootNodeWithFullChildren's children)
-      const directChildrenOfRootPruned = rootNodeWithFullChildren.children.map(directChild => ({
-        ...directChild,
-        children: [] 
-      }));
-      
-      return [{
-        ...rootNodeWithFullChildren,
-        children: directChildrenOfRootPruned,
-      }];
+      return [rootNodeWithPrunedChildren];
     }
   }, [employees, searchTerm, viewStack, filteredEmployeeIdsForSearch, isCurrentlySearching, fullEmployeeMap, isPrinting]);
 
@@ -537,7 +537,8 @@ export default function OrgWeaverPage() {
 
   const handlePrintChart = () => {
     setIsPrinting(true);
-    requestAnimationFrame(() => {
+    // Use a timeout to help ensure the DOM updates before print dialog
+    setTimeout(() => {
       try {
         window.print();
       } catch (error) {
@@ -548,13 +549,13 @@ export default function OrgWeaverPage() {
             variant: "destructive",
           });
       } finally {
-        // Use another rAF to ensure the print dialog has had a chance to close
-        // or at least the blocking operation is done.
-        requestAnimationFrame(() => {
+        // Reset isPrinting state after a short delay,
+        // allowing print dialog to process/close.
+        setTimeout(() => {
             setIsPrinting(false);
-        });
+        }, 100); 
       }
-    });
+    }, 100); // 100ms delay before calling window.print()
   };
 
   const canGoUp = viewStack.length > 0 || (isCurrentlySearching && viewStack.length === 0 && searchTerm.length > 0);
@@ -736,6 +737,7 @@ export default function OrgWeaverPage() {
             onEditClick={handleEditEmployeeClick}
             selectedNodeId={selectedNodeId}
             pageSize={pageSize}
+            isPrinting={isPrinting}
           />
         </main>
       </SidebarInset>
@@ -777,3 +779,4 @@ export default function OrgWeaverPage() {
     </SidebarProvider>
   );
 }
+

@@ -1,92 +1,101 @@
-/* public/print.css */
+
 @media print {
   body {
-    font-family: 'Arial', sans-serif;
     margin: 0;
-    padding: 0;
-    color: #000 !important;
-    background-color: #fff !important;
-    -webkit-print-color-adjust: exact; /* Ensures background colors and images are printed in Chrome/Safari */
-    print-color-adjust: exact; /* Standard property for color adjust */
+    padding: 10mm; /* Standard page margin */
+    font-size: 9pt; /* Slightly smaller base font for print if needed */
+    -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
+    print-color-adjust: exact !important; /* Standard */
+    background-color: white !important;
   }
 
-  /* Hide non-essential elements */
-  header.sticky, /* AppHeader */
-  div[data-sidebar='sidebar'], /* The main sidebar */
-  button[data-sidebar='trigger'], /* Mobile sidebar trigger */
-  button[aria-label*="Delete Selected Employee"], /* Specific delete button */
-  div[role="dialog"], /* All dialog modals */
-  div[data-radix-toast-viewport], /* Toast notifications */
-  iframe, /* If any iframes are present */
-  .hide-on-print /* Utility class for manual hiding */
-  {
+  /* Hide non-essential UI elements */
+  header, 
+  .group.peer.hidden.md\\:block, /* Sidebar wrapper (might need more specific selector if this is too broad) */
+  .md\\:hidden, /* Mobile triggers */
+  button:not(.printable-button), /* Hide all buttons unless explicitly marked for printing */
+  .sidebar-group,
+  .sidebar-footer,
+  .sidebar-header > .flex.items-center.gap-2.group-data-\\[collapsible\\=icon\\]\\/sidebar\\:justify-center > .text-lg.font-semibold, /* Hide sidebar title text */
+  .toaster,
+  .non-printable, /* Generic class to hide elements */
+  .app-header-actions, /* If AppHeader has action buttons container */
+  .sidebar-input-container, /* If search input has a container */
+  .attribute-selector-container, /* If attribute selector has a container */
+  .page-size-selector-container, /* If page size selector has a container */
+  .action-buttons-container, /* If action buttons have a container */
+  .ai-tools-container, /* If AI tools have a container */
+  #radix-\\:R2l6laja\\: > div.flex.items-center.gap-2.group-data-\\[collapsible\\=icon\\]\\/sidebar\\:justify-center, /* Example specific Radix ID, unreliable */
+  .sticky.top-0, /* AppHeader */
+  .bg-sidebar, /* Sidebar background */
+  .border-sidebar-border /* Sidebar border */
+   {
     display: none !important;
-    visibility: hidden !important;
   }
 
-  /* Ensure the main chart content area (SidebarInset which is a <main> tag) is visible */
-  main.flex-1 {
-    display: block !important;
+  /* Ensure the main chart container takes full width and flows naturally for pagination */
+  #hierarchy-visualizer-container {
     width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    position: static !important;
-    margin: 0 !important;
-    padding: 1cm !important; /* Add some padding for print */
+    height: auto !important; /* Let height grow with content */
+    min-height: 0 !important; /* Override any min-height from screen styles */
+    overflow: visible !important; /* Allow content to flow to new pages */
     box-shadow: none !important;
     border: none !important;
-    background-color: #fff !important; /* Ensure white background for the print area */
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: white !important; /* Ensure background is white */
   }
 
-  /* Specifically target the HierarchyVisualizer's direct parent if needed, but main should cover it */
-  /* div.p-1.md\:p-2.overflow-auto.h-full.bg-background (HierarchyVisualizer's wrapper) */
-  main.flex-1 > div {
-     background-color: #fff !important;
-     padding: 0 !important;
-     margin: 0 !important;
-     overflow: visible !important;
-     height: auto !important;
-  }
-
-
-  /* Org Chart Node Card Styles for Print */
-  .org-chart-node-card, /* If you have a specific class on cards */
-  article[class*="Card-module"], /* Fallback for generic card class */
-  div[class*="card"] /* General card targeting */
-  {
-    border: 1px solid #ccc !important;
-    box-shadow: none !important;
-    page-break-inside: avoid !important;
-    margin-bottom: 8px; /* Space between stacked cards */
-    background-color: #fff !important;
-  }
-
-  /* Ensure text within cards is legible */
-  .org-chart-node-card *,
-  article[class*="Card-module"] *,
-  div[class*="card"] * {
-    color: #000 !important;
+  .org-chart-segment {
+     page-break-inside: avoid; /* Try to keep a segment (card + its direct children group) on one page */
+     padding-top: 0 !important; /* Remove padding that might cause unneeded space at page tops */
+     margin-bottom: 5mm !important; /* Space between segments if they break */
   }
   
-  /* Hierarchy lines */
-  ul[class*="border-l-2"] {
-    border-left-width: 1px !important;
-    border-color: #888 !important; /* A light, printable gray */
-    padding-left: 0.5rem !important; /* Maintain some indentation */
+  /* Style cards for print */
+  .card { /* Assuming OrgChartNodeCard uses a .card class or similar root */
+    border: 1px solid #bbb !important; /* Lighter border for print */
+    box-shadow: none !important;
+    page-break-inside: avoid; /* Try to keep individual cards on one page */
+    background-color: white !important;
+    margin-bottom: 2mm; /* Space between cards in a grid */
   }
 
-  /* General link styling for print */
-  a {
-    text-decoration: none;
+  /* Ensure text is visible and uses print-friendly colors */
+  * {
+    color: #000 !important; /* Force black text */
+    background-color: transparent !important; /* Ensure backgrounds don't hide text unless specified */
+  }
+  
+  .card-title, .card-description, .card-content, .text-muted-foreground, .text-foreground, p, span, div {
     color: #000 !important;
+    font-size: 8pt !important; /* Smaller font for card content */
   }
-  a[href^="http"]:after {
-    content: " (" attr(href) ")"; /* Optionally show URLs for external links */
-    font-size: 90%;
+  .card-title {
+    font-size: 10pt !important; /* Slightly larger for card titles */
   }
 
-  @page {
-    size: A4;
-    margin: 1cm; /* Default margin for A4 pages */
+  .bg-muted {
+    background-color: #f0f0f0 !important; /* Light gray for muted if desired, or transparent */
+  }
+
+  /* Ensure SVGs (icons) are visible if they rely on currentColor */
+  svg {
+    fill: currentColor;
+    stroke: currentColor;
+  }
+
+  /* Remove unnecessary margins or paddings from layout components */
+  main.flex-1 {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .flex.flex-col { /* For SidebarInset */
+    height: auto !important;
+  }
+
+  /* Try to control page breaks more explicitly */
+   .org-chart-segment:not(:first-child) {
+    /* page-break-before: auto; */ /* Let browser decide, or 'always' if needed */
   }
 }
