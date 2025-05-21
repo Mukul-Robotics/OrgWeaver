@@ -7,9 +7,9 @@ export interface Employee {
   jobName: string;
   positionNumber: string; // Unique position identifier
   supervisorPositionNumber?: string | null;
-  grade: string; // Made mandatory
+  grade: string;
   department?: string;
-  location: string; // Made mandatory
+  location: string;
   proformaCost: number;
   employeeCategory?: string;
 }
@@ -38,7 +38,7 @@ export type DisplayAttributeKey =
   | 'employeeCategory';
 
 export const ALL_DISPLAY_ATTRIBUTES: Record<DisplayAttributeKey, string> = {
-  employeeNumber: "Record ID",
+  employeeNumber: "Record ID", // "Employee No." was used before, "Record ID" is more general
   employeeName: "Name",
   supervisorId: "Supervisor Record ID",
   supervisorName: "Supervisor Name",
@@ -71,7 +71,6 @@ export const EMPLOYEE_CATEGORIES: { value: string; label: string }[] = [
   { value: "Intern", label: "Intern" },
   { value: "IndividualConsultant", label: "Individual Consultant" },
   { value: "Fellow", label: "Fellow" },
-  { value: "N/A", label: "N/A (Not Applicable)"},
 ];
 
 export const PREDEFINED_GRADES: { value: string; label: string }[] = [
@@ -130,7 +129,7 @@ export interface AiRecommendationsData {
   recommendations: AiRecommendation[];
 }
 
-export type PageSize = 'fitToScreen' | 'a4Portrait' | 'a4Landscape' | 'letterPortrait' | 'letterLandscape';
+export type PageSize = 'fitToScreen' | 'a4Portrait' | 'a4Landscape' | 'letterPortrait' | 'letterLandscape' | 'a5Portrait' | 'a5Landscape';
 
 export const PAGE_SIZE_OPTIONS: { value: PageSize, label: string }[] = [
   { value: 'fitToScreen', label: 'Fit to Screen' },
@@ -138,6 +137,8 @@ export const PAGE_SIZE_OPTIONS: { value: PageSize, label: string }[] = [
   { value: 'a4Landscape', label: 'A4 Landscape (297x210mm)' },
   { value: 'letterPortrait', label: 'Letter Portrait (8.5x11in)' },
   { value: 'letterLandscape', label: 'Letter Landscape (11x8.5in)' },
+  { value: 'a5Portrait', label: 'A5 Portrait (148x210mm)' },
+  { value: 'a5Landscape', label: 'A5 Landscape (210x148mm)' },
 ];
 
 export const DEFAULT_PAGE_SIZE: PageSize = 'fitToScreen';
